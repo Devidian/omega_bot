@@ -11,5 +11,12 @@ Currently the format looks like this:
 
 ## Invitation Link
 
-https://discordapp.com/oauth2/authorize?client_id=523854335873122355&scope=bot&permissions=536938496
+https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&permissions=604056640
 
+## Usage
+
+|Command|Description|Permission|
+|-|-|-|
+|!add [what] [text]|Adds a new entry to [what]|Administrators|
+|!remove [what]|Remove everything from [what]|Administrators|
+|?[what]|print out information regarding [what], shuffle if multiple entries exist|everyone|
