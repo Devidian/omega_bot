@@ -1,0 +1,16 @@
+[Unit]
+Description=Hellbot Discord Bot Unit
+
+[Service]
+ExecStart=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/main.js
+ExecReload=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/app-cli.js REBOOT
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=FLABO
+User=nodejs
+Group=nodejs
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

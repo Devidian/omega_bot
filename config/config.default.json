@@ -1,0 +1,22 @@
+{
+    "log": {
+        "info": true,
+        "debug": true,
+        "warn": true
+    },
+    "master": {
+        "title": "Flamongobot",
+        "ioport": 47110
+    },
+    "cli": {
+        "commands": [
+            "REBOOT"
+        ]
+    },
+    "discord": {
+        "enabled": false,
+        "token": null,
+        "botname": "omegabot",
+        "hookname": "omegabot-"
+    }
+}
