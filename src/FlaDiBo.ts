@@ -143,12 +143,12 @@ export class FlaDiBo extends WorkerProcess {
 								const Game = Member.presence.game;
 								const lastGame = aCache.get(Member.id);
 								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
-									const txtCh: TextChannel = Guild.channels.filter((ch, chid) => { console.log(`${ch.id} (${ch.name})`); return ch.id == streamerChannelId })[0];
+									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 									try {
 										!txtCh ? null : txtCh.send(`@everyone Attention! ${Member.nickname} is streaming ${Game.name}`);
 										!txtCh ? null : aCache.set(Member.id, Game);
 									} catch (error) {
-										console.log(error)
+										console.log(error);
 									}
 								}
 							});
