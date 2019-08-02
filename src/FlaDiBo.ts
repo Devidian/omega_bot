@@ -227,6 +227,7 @@ export class FlaDiBo extends WorkerProcess {
 							});
 							this.streamerAllowed.set(guildId, streamerList);
 							try {
+								this.saveGuildSettings(guildId);
 								msg.react("👍");
 							} catch (error) {
 								msg.react("👎");
@@ -246,6 +247,7 @@ export class FlaDiBo extends WorkerProcess {
 							});
 							this.streamerAllowed.set(guildId, streamerList);
 							try {
+								this.saveGuildSettings(guildId);
 								msg.react("👍");
 							} catch (error) {
 								msg.react("👎");
@@ -258,6 +260,7 @@ export class FlaDiBo extends WorkerProcess {
 						if (isAdmin) {
 							this.streamerChannel.set(guildId, msg.channel.id);
 							try {
+								this.saveGuildSettings(guildId);
 								msg.react("👍");
 							} catch (error) {
 								msg.react("👎");
@@ -273,6 +276,7 @@ export class FlaDiBo extends WorkerProcess {
 							const to = value == "true";
 							this.streamerAllowAll.set(guildId, to);
 							try {
+								this.saveGuildSettings(guildId);
 								msg.react("👍");
 							} catch (error) {
 								msg.react("👎");
