@@ -17,6 +17,7 @@ export class FlaDiBo extends WorkerProcess {
 	protected streamerAllowAll: Map<string, boolean> = new Map<string, boolean>();
 
 	protected announcementCache: Map<string, Map<string, Game>> = new Map<string, Map<string, Game>>();
+	protected settingsLoaded: Map<string, boolean> = new Map<string, boolean>();
 
 	constructor() {
 		super();
@@ -68,6 +69,7 @@ export class FlaDiBo extends WorkerProcess {
 	 * @memberof FlaDiBo
 	 */
 	protected loadGuildSettings(guildId: string) {
+		if (this.settingsLoaded.has(guildId) && this.settingsLoaded.get(guildId)) return;
 		let GuildSettings = null;
 		try {
 			const file = resolve(__dirname, "..", "infos", guildId + ".json");
@@ -83,6 +85,8 @@ export class FlaDiBo extends WorkerProcess {
 				this.streamerAllowAll.set(guildId, false);
 				this.streamerAllowed.set(guildId, []);
 				this.streamerChannel.set(guildId, null);
+			} finally {
+				this.settingsLoaded.set(guildId, true);
 			}
 
 		} catch (error) {
@@ -112,29 +116,29 @@ export class FlaDiBo extends WorkerProcess {
 						this.streamerChecks.set(key, setTimeout(() => {
 							const Guild: Guild = G;
 							this.loadGuildSettings(Guild.id);
-	
+
 							// if (!this.streamerChannel.has(G.id)) {
 							// 	this.streamerChannel.set(G.id, null);
 							// }
 							const streamerChannelId = this.streamerChannel.get(G.id);
-	
+
 							if (!streamerChannelId) return;
-	
+
 							// if (!this.streamerAllowAll.has(G.id)) {
 							// 	this.streamerAllowAll.set(G.id, false);
 							// }
 							const allowAll = this.streamerAllowAll.get(G.id);
-	
+
 							// if (!this.streamerAllowed.has(G.id)) {
 							// 	this.streamerAllowed.set(G.id, []);
 							// }
 							const allowedStreamer = this.streamerAllowed.get(G.id);
-	
+
 							if (!this.announcementCache.has(G.id)) {
 								this.announcementCache.set(G.id, new Map<string, Game>());
 							}
 							const aCache = this.announcementCache.get(G.id);
-	
+
 							Guild.members.forEach((Member, key) => {
 								const Game = Member.presence.game;
 								const lastGame = aCache.get(Member.id);
@@ -151,7 +155,7 @@ export class FlaDiBo extends WorkerProcess {
 				});
 			});
 
-			
+
 
 			this.DiscordBot.on('message', msg => {
 				if (!msg.guild) return;
