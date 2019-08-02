@@ -146,11 +146,11 @@ export class FlaDiBo extends WorkerProcess {
 									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 									try {
 										!txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade \`${Game.name}\` \n Siehe hier:${Game.url}`);
-										!txtCh ? null : aCache.set(Member.id, Game);
 									} catch (error) {
 										console.log(error);
 									}
 								}
+								aCache.set(Member.id, Game);
 							});
 							this.announcementCache.set(G.id, aCache);
 							this.streamerChecks.get(key).refresh();
