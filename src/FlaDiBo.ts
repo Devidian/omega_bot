@@ -1,4 +1,4 @@
-import { Client, TextChannel, Guild, GuildChannel, MessageOptions, Attachment, RichEmbed, WebhookMessageOptions, Permissions } from "discord.js";
+import { Client, TextChannel, Guild, GuildChannel, MessageOptions, Attachment, RichEmbed, WebhookMessageOptions, Permissions, Game } from "discord.js";
 import { cfg, LOGTAG } from "./config";
 import * as jdenticon from "jdenticon";
 
@@ -6,6 +6,7 @@ import { WorkerProcess } from "./WorkerProcess";
 import { resolve } from "path";
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { shuffle } from "./shuffle";
+import { stringify } from "querystring";
 
 export class FlaDiBo extends WorkerProcess {
 	protected DiscordBot: Client = null;
@@ -14,6 +15,8 @@ export class FlaDiBo extends WorkerProcess {
 	protected streamerChannel: Map<string, string> = new Map<string, string>();
 	protected streamerAllowed: Map<string, string[]> = new Map<string, string[]>();
 	protected streamerAllowAll: Map<string, boolean> = new Map<string, boolean>();
+
+	protected announcementCache: Map<string, Map<string, Game>> = new Map<string, Map<string, Game>>();
 
 	constructor() {
 		super();
@@ -110,7 +113,7 @@ export class FlaDiBo extends WorkerProcess {
 					this.streamerChecks.set(key, setTimeout(() => {
 						const Guild: Guild = G;
 						this.loadGuildSettings(Guild.id);
-						
+
 						// if (!this.streamerChannel.has(G.id)) {
 						// 	this.streamerChannel.set(G.id, null);
 						// }
@@ -128,13 +131,21 @@ export class FlaDiBo extends WorkerProcess {
 						// }
 						const allowedStreamer = this.streamerAllowed.get(G.id);
 
+						if (!this.announcementCache.has(G.id)) {
+							this.announcementCache.set(G.id, new Map<string, Game>());
+						}
+						const aCache = this.announcementCache.get(G.id);
+
 						Guild.members.forEach((Member, key) => {
 							const Game = Member.presence.game;
-							if (Game && Game.streaming && (allowAll || allowedStreamer.includes(Member.id))) {
-								const ch: TextChannel = Guild.channels.filter((ch, chid) => chid == streamerChannelId)[0];
-								ch.send(`Member ${Member.nickname} is streaming ${Game.name}`);
+							const lastGame = aCache.get(Member.id);
+							if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
+								const ch: TextChannel = Guild.channels.filter((ch, chid) => ch.id == streamerChannelId)[0];
+								ch.send(`@everyone Attention! ${Member.nickname} is streaming ${Game.name}`);
+								aCache.set(Member.id, Game);
 							}
 						});
+						this.announcementCache.set(G.id, aCache);
 						this.streamerChecks.get(key).refresh();
 					}, 5000));
 				}
@@ -177,7 +188,9 @@ export class FlaDiBo extends WorkerProcess {
 
 					const author = msg.author;
 					const member = await msg.guild.fetchMember(author);
-					const isAdmin = member.hasPermission("ADMINISTRATOR");
+					const isDeveloper = member.id == "385696536949948428";
+					const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
+
 
 					if (msg.content.startsWith("!remove")) {
 						if (isAdmin) {
@@ -242,7 +255,7 @@ export class FlaDiBo extends WorkerProcess {
 							const streamerList = this.streamerAllowed.get(guildId) || [];
 							msg.mentions.members.array().forEach((Member) => {
 								if (streamerList.includes(Member.id)) {
-									streamerList.splice(streamerList.indexOf(Member.id),1);
+									streamerList.splice(streamerList.indexOf(Member.id), 1);
 								}
 							});
 							this.streamerAllowed.set(guildId, streamerList);
