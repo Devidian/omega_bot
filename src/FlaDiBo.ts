@@ -105,51 +105,53 @@ export class FlaDiBo extends WorkerProcess {
 			this.DiscordBot = new Client();
 			this.DiscordBot.on('ready', () => {
 				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `Logged in as ${this.DiscordBot.user.tag}!`);
-			});
 
-			this.DiscordBot.guilds.forEach((G, key) => {
-				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `I'am member of ${G.name} with ${G.memberCount} members`);
-				if (!this.streamerChecks.has(key)) {
-					this.streamerChecks.set(key, setTimeout(() => {
-						const Guild: Guild = G;
-						this.loadGuildSettings(Guild.id);
-
-						// if (!this.streamerChannel.has(G.id)) {
-						// 	this.streamerChannel.set(G.id, null);
-						// }
-						const streamerChannelId = this.streamerChannel.get(G.id);
-
-						if (!streamerChannelId) return;
-
-						// if (!this.streamerAllowAll.has(G.id)) {
-						// 	this.streamerAllowAll.set(G.id, false);
-						// }
-						const allowAll = this.streamerAllowAll.get(G.id);
-
-						// if (!this.streamerAllowed.has(G.id)) {
-						// 	this.streamerAllowed.set(G.id, []);
-						// }
-						const allowedStreamer = this.streamerAllowed.get(G.id);
-
-						if (!this.announcementCache.has(G.id)) {
-							this.announcementCache.set(G.id, new Map<string, Game>());
-						}
-						const aCache = this.announcementCache.get(G.id);
-
-						Guild.members.forEach((Member, key) => {
-							const Game = Member.presence.game;
-							const lastGame = aCache.get(Member.id);
-							if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
-								const ch: TextChannel = Guild.channels.filter((ch, chid) => ch.id == streamerChannelId)[0];
-								ch.send(`@everyone Attention! ${Member.nickname} is streaming ${Game.name}`);
-								aCache.set(Member.id, Game);
+				this.DiscordBot.guilds.forEach((G, key) => {
+					!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `I'am member of ${G.name} with ${G.memberCount} members`);
+					if (!this.streamerChecks.has(key)) {
+						this.streamerChecks.set(key, setTimeout(() => {
+							const Guild: Guild = G;
+							this.loadGuildSettings(Guild.id);
+	
+							// if (!this.streamerChannel.has(G.id)) {
+							// 	this.streamerChannel.set(G.id, null);
+							// }
+							const streamerChannelId = this.streamerChannel.get(G.id);
+	
+							if (!streamerChannelId) return;
+	
+							// if (!this.streamerAllowAll.has(G.id)) {
+							// 	this.streamerAllowAll.set(G.id, false);
+							// }
+							const allowAll = this.streamerAllowAll.get(G.id);
+	
+							// if (!this.streamerAllowed.has(G.id)) {
+							// 	this.streamerAllowed.set(G.id, []);
+							// }
+							const allowedStreamer = this.streamerAllowed.get(G.id);
+	
+							if (!this.announcementCache.has(G.id)) {
+								this.announcementCache.set(G.id, new Map<string, Game>());
 							}
-						});
-						this.announcementCache.set(G.id, aCache);
-						this.streamerChecks.get(key).refresh();
-					}, 5000));
-				}
+							const aCache = this.announcementCache.get(G.id);
+	
+							Guild.members.forEach((Member, key) => {
+								const Game = Member.presence.game;
+								const lastGame = aCache.get(Member.id);
+								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
+									const ch: TextChannel = Guild.channels.filter((ch, chid) => ch.id == streamerChannelId)[0];
+									ch.send(`@everyone Attention! ${Member.nickname} is streaming ${Game.name}`);
+									aCache.set(Member.id, Game);
+								}
+							});
+							this.announcementCache.set(G.id, aCache);
+							this.streamerChecks.get(key).refresh();
+						}, 5000));
+					}
+				});
 			});
+
+			
 
 			this.DiscordBot.on('message', msg => {
 				if (!msg.guild) return;
