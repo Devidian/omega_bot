@@ -20,3 +20,7 @@ https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&p
 |!add [what] [text]|Adds a new entry to [what]|Administrators|
 |!remove [what]|Remove everything from [what]|Administrators|
 |?[what]|print out information regarding [what], shuffle if multiple entries exist|everyone|
+|!addStreamer @name ...|Add one or more streamer|Administrators|
+|!setStreamChannel|Set the channel as announcement channel|Administrators|
+|!setAllowAll true/false|set true if you want all members streaming to be announced|Administrators|
+|!removeStreamer @name|remove a streamer from streaming whitelist|Administrators|

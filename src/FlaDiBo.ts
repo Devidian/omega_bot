@@ -10,6 +10,10 @@ import { shuffle } from "./shuffle";
 export class FlaDiBo extends WorkerProcess {
 	protected DiscordBot: Client = null;
 	protected timer: NodeJS.Timer = null;
+	protected streamerChecks: Map<string, NodeJS.Timer> = new Map<string, NodeJS.Timer>();
+	protected streamerChannel: Map<string, string> = new Map<string, string>();
+	protected streamerAllowed: Map<string, string[]> = new Map<string, string[]>();
+	protected streamerAllowAll: Map<string, boolean> = new Map<string, boolean>();
 
 	constructor() {
 		super();
@@ -26,6 +30,70 @@ export class FlaDiBo extends WorkerProcess {
 		return Promise.resolve(true);
 	}
 
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {string} guildId
+	 * @memberof FlaDiBo
+	 */
+	protected saveGuildSettings(guildId: string) {
+		const GuildSettings = {
+			allowAll: this.streamerAllowAll.get(guildId) || false,
+			streamerList: this.streamerAllowed.get(guildId) || [],
+			streamerChannelId: this.streamerChannel.get(guildId) || null
+		};
+
+		try {
+			const file = resolve(__dirname, "..", "infos", guildId + ".json");
+			try {
+				writeFileSync(file, JSON.stringify(GuildSettings, null, 2));
+			} catch (error) {
+				console.log(LOGTAG.ERROR, error);
+			}
+
+		} catch (error) {
+			console.log(LOGTAG.ERROR, error);
+		}
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {string} guildId
+	 * @memberof FlaDiBo
+	 */
+	protected loadGuildSettings(guildId: string) {
+		let GuildSettings = null;
+		try {
+			const file = resolve(__dirname, "..", "infos", guildId + ".json");
+			try {
+				const dataRaw = readFileSync(file);
+				GuildSettings = JSON.parse(dataRaw.toString());
+				this.streamerAllowAll.set(guildId, GuildSettings.allowAll);
+				this.streamerAllowed.set(guildId, GuildSettings.streamerList);
+				this.streamerChannel.set(guildId, GuildSettings.streamerChannelId);
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:loadGuildSettings]", `Guild <${guildId}> settings found and loaded!`);
+			} catch (error) {
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:loadGuildSettings]", `Guild <${guildId}> not found set all to default`);
+				this.streamerAllowAll.set(guildId, false);
+				this.streamerAllowed.set(guildId, []);
+				this.streamerChannel.set(guildId, null);
+			}
+
+		} catch (error) {
+			console.log(LOGTAG.ERROR, error);
+		}
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
+	 * @returns {void}
+	 * @memberof FlaDiBo
+	 */
 	protected setupDiscordBot(): void {
 		if (!cfg.discord || !cfg.discord.enabled) {
 			!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `Discord not enabled.`);
@@ -35,6 +103,43 @@ export class FlaDiBo extends WorkerProcess {
 			this.DiscordBot.on('ready', () => {
 				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `Logged in as ${this.DiscordBot.user.tag}!`);
 			});
+
+			this.DiscordBot.guilds.forEach((G, key) => {
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `I'am member of ${G.name} with ${G.memberCount} members`);
+				if (!this.streamerChecks.has(key)) {
+					this.streamerChecks.set(key, setTimeout(() => {
+						const Guild: Guild = G;
+						this.loadGuildSettings(Guild.id);
+						
+						// if (!this.streamerChannel.has(G.id)) {
+						// 	this.streamerChannel.set(G.id, null);
+						// }
+						const streamerChannelId = this.streamerChannel.get(G.id);
+
+						if (!streamerChannelId) return;
+
+						// if (!this.streamerAllowAll.has(G.id)) {
+						// 	this.streamerAllowAll.set(G.id, false);
+						// }
+						const allowAll = this.streamerAllowAll.get(G.id);
+
+						// if (!this.streamerAllowed.has(G.id)) {
+						// 	this.streamerAllowed.set(G.id, []);
+						// }
+						const allowedStreamer = this.streamerAllowed.get(G.id);
+
+						Guild.members.forEach((Member, key) => {
+							const Game = Member.presence.game;
+							if (Game && Game.streaming && (allowAll || allowedStreamer.includes(Member.id))) {
+								const ch: TextChannel = Guild.channels.filter((ch, chid) => chid == streamerChannelId)[0];
+								ch.send(`Member ${Member.nickname} is streaming ${Game.name}`);
+							}
+						});
+						this.streamerChecks.get(key).refresh();
+					}, 5000));
+				}
+			});
+
 			this.DiscordBot.on('message', msg => {
 				if (!msg.guild) return;
 				// ignore bot messages
@@ -69,12 +174,15 @@ export class FlaDiBo extends WorkerProcess {
 					// 	const buffer = Buffer.from(Message.attachment, "base64");
 					// 	WHO.file = new Attachment(buffer, "screenshot.jpg");
 					// }
+
+					const author = msg.author;
+					const member = await msg.guild.fetchMember(author);
+					const isAdmin = member.hasPermission("ADMINISTRATOR");
+
 					if (msg.content.startsWith("!remove")) {
-						const author = msg.author;
-						const member = await msg.guild.fetchMember(author);
-						if (member.hasPermission("ADMINISTRATOR")) {
+						if (isAdmin) {
 							const [command, target] = msg.content.split(" ");
-							const file = resolve(__dirname, "..", "infos", target.toLowerCase() + ".json");
+							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
 							try {
 								unlinkSync(file);
 								msg.react("👍");
@@ -86,11 +194,9 @@ export class FlaDiBo extends WorkerProcess {
 							return;
 						}
 					} else if (msg.content.startsWith("!add")) {
-						const author = msg.author;
-						const member = await msg.guild.fetchMember(author);
-						if (member.hasPermission("ADMINISTRATOR")) {
+						if (isAdmin) {
 							const [command, target, ...text] = msg.content.split(" ");
-							const file = resolve(__dirname, "..", "infos", target.toLowerCase() + ".json");
+							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
 							let data = null;
 							try {
 								const dataRaw = readFileSync(file);
@@ -106,6 +212,71 @@ export class FlaDiBo extends WorkerProcess {
 							writeFileSync(file, JSON.stringify(data, null, 2));
 							msg.react("👍");
 							return;
+						} else {
+							msg.react("👎");
+							return;
+						}
+					} else if (msg.content.startsWith("!addStreamer")) {
+						if (isAdmin) {
+							const [command, streamer] = msg.content.split(" ");
+							const streamerList = this.streamerAllowed.get(guildId) || [];
+							msg.mentions.members.array().forEach((Member) => {
+								if (!streamerList.includes(Member.id)) {
+									streamerList.push(Member.id);
+								}
+							});
+							this.streamerAllowed.set(guildId, streamerList);
+							try {
+								msg.react("👍");
+							} catch (error) {
+								msg.react("👎");
+							}
+						} else {
+							msg.react("👎");
+							return;
+						}
+					} else if (msg.content.startsWith("!removeStreamer")) {
+						if (isAdmin) {
+							const [command, streamer] = msg.content.split(" ");
+							const streamerList = this.streamerAllowed.get(guildId) || [];
+							msg.mentions.members.array().forEach((Member) => {
+								if (streamerList.includes(Member.id)) {
+									streamerList.splice(streamerList.indexOf(Member.id),1);
+								}
+							});
+							this.streamerAllowed.set(guildId, streamerList);
+							try {
+								msg.react("👍");
+							} catch (error) {
+								msg.react("👎");
+							}
+						} else {
+							msg.react("👎");
+							return;
+						}
+					} else if (msg.content.startsWith("!setStreamChannel")) {
+						if (isAdmin) {
+							this.streamerChannel.set(guildId, msg.channel.id);
+							try {
+								msg.react("👍");
+							} catch (error) {
+								msg.react("👎");
+							}
+						} else {
+							msg.react("👎");
+							return;
+						}
+
+					} else if (msg.content.startsWith("!setAllowAll")) {
+						if (isAdmin) {
+							const [command, value] = msg.content.split(" ");
+							const to = value == "true";
+							this.streamerAllowAll.set(guildId, to);
+							try {
+								msg.react("👍");
+							} catch (error) {
+								msg.react("👎");
+							}
 						} else {
 							msg.react("👎");
 							return;

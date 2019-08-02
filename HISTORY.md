@@ -1,5 +1,12 @@
 ## [Unreleased]
 
+### Added
+- streamer Announcements!
+  - type `!addStreamer @name ...` to add streamers that should be announced
+  - type `!setStreamChannel` in the channel that should be used for announcements
+  - type `!setAllowAll true` to announce all streamers
+  - type `!removeStreamer @name` to remove streamer from streamer list 
+
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)
 
