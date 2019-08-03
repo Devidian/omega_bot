@@ -145,7 +145,7 @@ export class FlaDiBo extends WorkerProcess {
 								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
 									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 									try {
-										!txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade \`${Game.name}\` \n Siehe hier:${Game.url}`);
+										!txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
 									} catch (error) {
 										console.log(error);
 									}
