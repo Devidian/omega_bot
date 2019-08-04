@@ -29,7 +29,7 @@ export class Master {
 	 */
 	constructor() {
 		this.setupIOServer();
-		this.bootWorker('fladibo');
+		this.bootWorker('omegabot');
 
 		watchFS(__dirname, (e: string, f: string) => {
 			if (f) {

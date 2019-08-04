@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { shuffle } from "./shuffle";
 import { stringify } from "querystring";
 
-export class FlaDiBo extends WorkerProcess {
+export class OmegaBot extends WorkerProcess {
 	protected DiscordBot: Client = null;
 	protected timer: NodeJS.Timer = null;
 	protected streamerChecks: Map<string, NodeJS.Timer> = new Map<string, NodeJS.Timer>();
@@ -17,6 +17,7 @@ export class FlaDiBo extends WorkerProcess {
 	protected streamerAllowAll: Map<string, boolean> = new Map<string, boolean>();
 
 	protected announcementCache: Map<string, Map<string, Game>> = new Map<string, Map<string, Game>>();
+	protected announcementDateCache: Map<string, Map<string, Date>> = new Map<string, Map<string, Date>>();
 	protected settingsLoaded: Map<string, boolean> = new Map<string, boolean>();
 
 	constructor() {
@@ -39,7 +40,7 @@ export class FlaDiBo extends WorkerProcess {
 	 *
 	 * @protected
 	 * @param {string} guildId
-	 * @memberof FlaDiBo
+	 * @memberof OmegaBot
 	 */
 	protected saveGuildSettings(guildId: string) {
 		const GuildSettings = {
@@ -66,7 +67,7 @@ export class FlaDiBo extends WorkerProcess {
 	 *
 	 * @protected
 	 * @param {string} guildId
-	 * @memberof FlaDiBo
+	 * @memberof OmegaBot
 	 */
 	protected loadGuildSettings(guildId: string) {
 		if (this.settingsLoaded.has(guildId) && this.settingsLoaded.get(guildId)) return;
@@ -79,9 +80,9 @@ export class FlaDiBo extends WorkerProcess {
 				this.streamerAllowAll.set(guildId, GuildSettings.allowAll);
 				this.streamerAllowed.set(guildId, GuildSettings.streamerList);
 				this.streamerChannel.set(guildId, GuildSettings.streamerChannelId);
-				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:loadGuildSettings]", `Guild <${guildId}> settings found and loaded!`);
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[OmegaBot:loadGuildSettings]", `Guild <${guildId}> settings found and loaded!`);
 			} catch (error) {
-				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:loadGuildSettings]", `Guild <${guildId}> not found set all to default`);
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[OmegaBot:loadGuildSettings]", `Guild <${guildId}> not found set all to default`);
 				this.streamerAllowAll.set(guildId, false);
 				this.streamerAllowed.set(guildId, []);
 				this.streamerChannel.set(guildId, null);
@@ -99,19 +100,19 @@ export class FlaDiBo extends WorkerProcess {
 	 *
 	 * @protected
 	 * @returns {void}
-	 * @memberof FlaDiBo
+	 * @memberof OmegaBot
 	 */
 	protected setupDiscordBot(): void {
 		if (!cfg.discord || !cfg.discord.enabled) {
-			!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `Discord not enabled.`);
+			!cfg.log.info ? null : console.log(LOGTAG.INFO, "[OmegaBot:setupDiscordBot]", `Discord not enabled.`);
 			return;
 		} else {
 			this.DiscordBot = new Client();
 			this.DiscordBot.on('ready', () => {
-				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `Logged in as ${this.DiscordBot.user.tag}!`);
+				!cfg.log.info ? null : console.log(LOGTAG.INFO, "[OmegaBot:setupDiscordBot]", `Logged in as ${this.DiscordBot.user.tag}!`);
 
 				this.DiscordBot.guilds.forEach((G, key) => {
-					!cfg.log.info ? null : console.log(LOGTAG.INFO, "[FlaDiBo:setupDiscordBot]", `I'am member of ${G.name} with ${G.memberCount} members`);
+					!cfg.log.info ? null : console.log(LOGTAG.INFO, "[OmegaBot:setupDiscordBot]", `I'am member of ${G.name} with ${G.memberCount} members`);
 					if (!this.streamerChecks.has(key)) {
 						this.streamerChecks.set(key, setTimeout(() => {
 							const Guild: Guild = G;
@@ -138,14 +139,19 @@ export class FlaDiBo extends WorkerProcess {
 								this.announcementCache.set(G.id, new Map<string, Game>());
 							}
 							const aCache = this.announcementCache.get(G.id);
+							const aDateCache = this.announcementDateCache.get(G.id);
+							const blockTime = new Date();
+							blockTime.setHours(blockTime.getHours()-1);
 
 							Guild.members.forEach((Member, key) => {
 								const Game = Member.presence.game;
 								const lastGame = aCache.get(Member.id);
-								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (allowAll || allowedStreamer.includes(Member.id))) {
+								const liveDate = aDateCache.get(Member.id);
+								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime()<blockTime.getTime()) && (allowAll || allowedStreamer.includes(Member.id))) {
 									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 									try {
 										!txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
+										aDateCache.set(Member.id,new Date());
 									} catch (error) {
 										console.log(error);
 									}
@@ -173,6 +179,7 @@ export class FlaDiBo extends WorkerProcess {
 				}
 				const guildId: string = msg.guild.id;
 				const TC: TextChannel = msg.channel as TextChannel;
+				!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[OmegaBot:omMessage]", `Message Guild: ${guildId} \n ${TC.guild.id}`);
 				const WebHookName = (cfg.discord.hookname + TC.name.toUpperCase()).substr(0, 32);
 				TC.fetchWebhooks().then((WHC) => {
 					const WH = WHC.filter((wh) => wh.name === WebHookName).first();
