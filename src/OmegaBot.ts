@@ -170,7 +170,7 @@ export class OmegaBot extends WorkerProcess {
 
 
 
-			this.DiscordBot.on('message', msg => {
+			this.DiscordBot.on('message', async msg => {
 				if (!msg.guild) return;
 				// ignore bot messages
 				if (msg.author.bot) {
@@ -182,149 +182,126 @@ export class OmegaBot extends WorkerProcess {
 				}
 				const guildId: string = msg.guild.id;
 				const TC: TextChannel = msg.channel as TextChannel;
-				// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[OmegaBot:omMessage]", `Message Guild: ${guildId} \n ${TC.guild.id}`);
-				const WebHookName = (cfg.discord.hookname + TC.name.toUpperCase()).substr(0, 32);
-				TC.fetchWebhooks().then((WHC) => {
-					const WH = WHC.filter((wh) => wh.name === WebHookName).first();
-					if (!WH) {
-						// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendBCMessageToDiscord]", `creating web-hook ${WebHookName}`);
-						return TC.createWebhook(WebHookName, jdenticon.toPng(process.hrtime().join("#"), 256));
-					} else {
-						// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendBCMessageToDiscord]", `web-hook ${WebHookName} found`);
-						return WH;
-					}
-				}).then(async (WH) => {
-					// const Avatar = jdenticon.toPng(Message.playerUID, 256);
-					// const b64Avatar = "data:image/png;base64," + encodeURIComponent(Avatar.toString('base64'));
-					// const AvatarURL = "https://api.adorable.io/avatars/128/" + Message.playerUID;
-					const WHO: WebhookMessageOptions = {
-						username: cfg.discord.botname,
-						// avatarURL: AvatarURL
-					};
-					// if (Message.attachment) {
-					// 	const buffer = Buffer.from(Message.attachment, "base64");
-					// 	WHO.file = new Attachment(buffer, "screenshot.jpg");
-					// }
 
-					const author = msg.author;
-					const member = await msg.guild.fetchMember(author);
-					const isDeveloper = member.id == "385696536949948428";
-					const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
+				const author = msg.author;
+				const member = await msg.guild.fetchMember(author);
+				const isDeveloper = member.id == "385696536949948428";
+				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
 
 
-					if (msg.content.startsWith("!remove")) {
-						if (isAdmin) {
-							const [command, target] = msg.content.split(" ");
-							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
-							try {
-								unlinkSync(file);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
-							}
-						} else {
-							msg.react("👎");
-							return;
-						}
-					} else if (msg.content.startsWith("!addStreamer")) {
-						if (isAdmin) {
-							const [command, streamer] = msg.content.split(" ");
-							const streamerList = this.streamerAllowed.get(guildId) || [];
-							msg.mentions.members.array().forEach((Member) => {
-								if (!streamerList.includes(Member.id)) {
-									streamerList.push(Member.id);
-								}
-							});
-							this.streamerAllowed.set(guildId, streamerList);
-							try {
-								this.saveGuildSettings(guildId);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
-							}
-						} else {
-							msg.react("👎");
-							return;
-						}
-					} else if (msg.content.startsWith("!add")) {
-						if (isAdmin) {
-							const [command, target, ...text] = msg.content.split(" ");
-							if(target=="help") {
-								msg.react("👎");
-								return;
-							}
-							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
-							let data = null;
-							try {
-								const dataRaw = readFileSync(file);
-								data = JSON.parse(dataRaw.toString());
-								if (Array.isArray(data.data)) {
-									data.data.push(text.join(' '));
-								} else {
-									data.data = [data.data, text.join(' ')];
-								}
-							} catch (error) {
-								data = { data: text.join(' ') };
-							}
-							writeFileSync(file, JSON.stringify(data, null, 2));
+				if (msg.content.startsWith("!remove")) {
+					if (isAdmin) {
+						const [command, target] = msg.content.split(" ");
+						const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
+						try {
+							unlinkSync(file);
 							msg.react("👍");
-							return;
-						} else {
+						} catch (error) {
 							msg.react("👎");
-							return;
 						}
-					} else if (msg.content.startsWith("!removeStreamer")) {
-						if (isAdmin) {
-							const [command, streamer] = msg.content.split(" ");
-							const streamerList = this.streamerAllowed.get(guildId) || [];
-							msg.mentions.members.array().forEach((Member) => {
-								if (streamerList.includes(Member.id)) {
-									streamerList.splice(streamerList.indexOf(Member.id), 1);
-								}
-							});
-							this.streamerAllowed.set(guildId, streamerList);
-							try {
-								this.saveGuildSettings(guildId);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
+					} else {
+						msg.react("👎");
+						return;
+					}
+				} else if (msg.content.startsWith("!addStreamer")) {
+					if (isAdmin) {
+						const [command, streamer] = msg.content.split(" ");
+						const streamerList = this.streamerAllowed.get(guildId) || [];
+						msg.mentions.members.array().forEach((Member) => {
+							if (!streamerList.includes(Member.id)) {
+								streamerList.push(Member.id);
 							}
-						} else {
+						});
+						this.streamerAllowed.set(guildId, streamerList);
+						try {
+							this.saveGuildSettings(guildId);
+							msg.react("👍");
+						} catch (error) {
+							msg.react("👎");
+						}
+					} else {
+						msg.react("👎");
+						return;
+					}
+				} else if (msg.content.startsWith("!add")) {
+					if (isAdmin) {
+						const [command, target, ...text] = msg.content.split(" ");
+						if(target=="help") {
 							msg.react("👎");
 							return;
 						}
-					} else if (msg.content.startsWith("!setStreamChannel")) {
-						if (isAdmin) {
-							this.streamerChannel.set(guildId, msg.channel.id);
-							try {
-								this.saveGuildSettings(guildId);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
+						const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
+						let data = null;
+						try {
+							const dataRaw = readFileSync(file);
+							data = JSON.parse(dataRaw.toString());
+							if (Array.isArray(data.data)) {
+								data.data.push(text.join(' '));
+							} else {
+								data.data = [data.data, text.join(' ')];
 							}
-						} else {
-							msg.react("👎");
-							return;
+						} catch (error) {
+							data = { data: text.join(' ') };
 						}
+						writeFileSync(file, JSON.stringify(data, null, 2));
+						msg.react("👍");
+						return;
+					} else {
+						msg.react("👎");
+						return;
+					}
+				} else if (msg.content.startsWith("!removeStreamer")) {
+					if (isAdmin) {
+						const [command, streamer] = msg.content.split(" ");
+						const streamerList = this.streamerAllowed.get(guildId) || [];
+						msg.mentions.members.array().forEach((Member) => {
+							if (streamerList.includes(Member.id)) {
+								streamerList.splice(streamerList.indexOf(Member.id), 1);
+							}
+						});
+						this.streamerAllowed.set(guildId, streamerList);
+						try {
+							this.saveGuildSettings(guildId);
+							msg.react("👍");
+						} catch (error) {
+							msg.react("👎");
+						}
+					} else {
+						msg.react("👎");
+						return;
+					}
+				} else if (msg.content.startsWith("!setStreamChannel")) {
+					if (isAdmin) {
+						this.streamerChannel.set(guildId, TC.id);
+						try {
+							this.saveGuildSettings(guildId);
+							msg.react("👍");
+						} catch (error) {
+							msg.react("👎");
+						}
+					} else {
+						msg.react("👎");
+						return;
+					}
 
-					} else if (msg.content.startsWith("!setAllowAll")) {
-						if (isAdmin) {
-							const [command, value] = msg.content.split(" ");
-							const to = value == "true";
-							this.streamerAllowAll.set(guildId, to);
-							try {
-								this.saveGuildSettings(guildId);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
-							}
-						} else {
-							msg.react("👎");
-							return;
-						}
-					} else if (msg.content.startsWith('?help')) {
+				} else if (msg.content.startsWith("!setAllowAll")) {
+					if (isAdmin) {
 						const [command, value] = msg.content.split(" ");
-						return WH.sendMessage(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
+						const to = value == "true";
+						this.streamerAllowAll.set(guildId, to);
+						try {
+							this.saveGuildSettings(guildId);
+							msg.react("👍");
+						} catch (error) {
+							msg.react("👎");
+						}
+					} else {
+						msg.react("👎");
+						return;
+					}
+				} else if (msg.content.startsWith('?help')) {
+					const [command, value] = msg.content.split(" ");
+					return TC.sendMessage(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
 \`\`\`\n
 Kommandos für Administratoren:
 !add [was?] [text]          | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
@@ -337,32 +314,62 @@ Kommandos für Administratoren:
 Kommandos für alle anderen:
 ?help                       | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
 ?[was?]                     | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
-\n\`\`\``, WHO);
-					} else if (msg.content.startsWith('?')) {
-						const name = msg.content.substr(1); // without ?
-						const datadir = resolve(__dirname, "..", "infos", guildId);
-						try {
-							mkdirSync(datadir);
-						} catch (error) {
-							console.log(LOGTAG.ERROR, error);
-						}
-						const file = resolve(datadir, name.toLowerCase() + ".json");
-						try {
-							const dataRaw = readFileSync(file);
-							const data = JSON.parse(dataRaw.toString());
-							if (Array.isArray(data.data)) {
-								shuffle(data.data);
-								return WH.sendMessage(`Oha, zu ${name} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`, WHO);
-							} else {
-								return WH.sendMessage(`Zu ${name} kann ich dir nur so viel sagen: \n${data.data}`, WHO);
-							}
-						} catch (error) {
-							return WH.sendMessage("Darüber weiss ich überhaupt gar nichts!", WHO);
-						}
+\n\`\`\``);
+				} else if (msg.content.startsWith('?')) {
+					const name = msg.content.substr(1); // without ?
+					const datadir = resolve(__dirname, "..", "infos", guildId);
+					try {
+						mkdirSync(datadir);
+					} catch (error) {
+						console.log(LOGTAG.ERROR, error);
 					}
-				}).catch(e => {
-					console.log(LOGTAG.ERROR, e);
-				});
+					const file = resolve(datadir, name.toLowerCase() + ".json");
+					try {
+						const dataRaw = readFileSync(file);
+						const data = JSON.parse(dataRaw.toString());
+						if (Array.isArray(data.data)) {
+							shuffle(data.data);
+							return TC.sendMessage(`Oha, zu ${name} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
+						} else {
+							return TC.sendMessage(`Zu ${name} kann ich dir nur so viel sagen: \n${data.data}`);
+						}
+					} catch (error) {
+						return TC.sendMessage("Darüber weiss ich überhaupt gar nichts!");
+					}
+				}
+
+
+
+
+
+				// // !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[OmegaBot:omMessage]", `Message Guild: ${guildId} \n ${TC.guild.id}`);
+				// const WebHookName = (cfg.discord.hookname + TC.name.toUpperCase()).substr(0, 32);
+				// TC.fetchWebhooks().then((WHC) => {
+				// 	const WH = WHC.filter((wh) => wh.name === WebHookName).first();
+				// 	if (!WH) {
+				// 		// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendBCMessageToDiscord]", `creating web-hook ${WebHookName}`);
+				// 		return TC.createWebhook(WebHookName, jdenticon.toPng(process.hrtime().join("#"), 256));
+				// 	} else {
+				// 		// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[sendBCMessageToDiscord]", `web-hook ${WebHookName} found`);
+				// 		return WH;
+				// 	}
+				// }).then(async (WH) => {
+				// 	// const Avatar = jdenticon.toPng(Message.playerUID, 256);
+				// 	// const b64Avatar = "data:image/png;base64," + encodeURIComponent(Avatar.toString('base64'));
+				// 	// const AvatarURL = "https://api.adorable.io/avatars/128/" + Message.playerUID;
+				// 	const WHO: WebhookMessageOptions = {
+				// 		username: cfg.discord.botname,
+				// 		// avatarURL: AvatarURL
+				// 	};
+				// 	// if (Message.attachment) {
+				// 	// 	const buffer = Buffer.from(Message.attachment, "base64");
+				// 	// 	WHO.file = new Attachment(buffer, "screenshot.jpg");
+				// 	// }
+
+					
+				// }).catch(e => {
+				// 	console.log(LOGTAG.ERROR, e);
+				// });
 
 
 
