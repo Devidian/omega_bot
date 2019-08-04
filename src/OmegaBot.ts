@@ -226,6 +226,26 @@ export class OmegaBot extends WorkerProcess {
 							msg.react("👎");
 							return;
 						}
+					} else if (msg.content.startsWith("!addStreamer")) {
+						if (isAdmin) {
+							const [command, streamer] = msg.content.split(" ");
+							const streamerList = this.streamerAllowed.get(guildId) || [];
+							msg.mentions.members.array().forEach((Member) => {
+								if (!streamerList.includes(Member.id)) {
+									streamerList.push(Member.id);
+								}
+							});
+							this.streamerAllowed.set(guildId, streamerList);
+							try {
+								this.saveGuildSettings(guildId);
+								msg.react("👍");
+							} catch (error) {
+								msg.react("👎");
+							}
+						} else {
+							msg.react("👎");
+							return;
+						}
 					} else if (msg.content.startsWith("!add")) {
 						if (isAdmin) {
 							const [command, target, ...text] = msg.content.split(" ");
@@ -245,26 +265,6 @@ export class OmegaBot extends WorkerProcess {
 							writeFileSync(file, JSON.stringify(data, null, 2));
 							msg.react("👍");
 							return;
-						} else {
-							msg.react("👎");
-							return;
-						}
-					} else if (msg.content.startsWith("!addStreamer")) {
-						if (isAdmin) {
-							const [command, streamer] = msg.content.split(" ");
-							const streamerList = this.streamerAllowed.get(guildId) || [];
-							msg.mentions.members.array().forEach((Member) => {
-								if (!streamerList.includes(Member.id)) {
-									streamerList.push(Member.id);
-								}
-							});
-							this.streamerAllowed.set(guildId, streamerList);
-							try {
-								this.saveGuildSettings(guildId);
-								msg.react("👍");
-							} catch (error) {
-								msg.react("👎");
-							}
 						} else {
 							msg.react("👎");
 							return;
