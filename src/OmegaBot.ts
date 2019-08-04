@@ -327,16 +327,16 @@ export class OmegaBot extends WorkerProcess {
 						return WH.sendMessage(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
 \`\`\`\n
 Kommandos für Administratoren:
-!add [was?] [text]			| Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
-!remove [was?]				| Entferne alle Einträge zu [was] aus dem Speicher
-!setStreamChannel			| Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
-!setAllowAll [true|false]	| Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
+!add [was?] [text]          | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
+!remove [was?]              | Entferne alle Einträge zu [was] aus dem Speicher
+!setStreamChannel           | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
+!setAllowAll [true|false]   | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
 !addStreamer @name @name... | Füge ein oder mehrere Streamer hinzu die ich ankündigen darf!
-!removeStreamer @name		| Du kannst einen Streamer auch wieder entfernen, dann bleibe ich still
+!removeStreamer @name       | Du kannst einen Streamer auch wieder entfernen, dann bleibe ich still
 -------------------------------
 Kommandos für alle anderen:
-?help						| Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
-?[was?]						| Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
+?help                       | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
+?[was?]                     | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
 \n\`\`\``, WHO);
 					} else if (msg.content.startsWith('?')) {
 						const name = msg.content.substr(1); // without ?
