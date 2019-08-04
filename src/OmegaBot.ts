@@ -182,7 +182,7 @@ export class OmegaBot extends WorkerProcess {
 				}
 				const guildId: string = msg.guild.id;
 				const TC: TextChannel = msg.channel as TextChannel;
-				!cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[OmegaBot:omMessage]", `Message Guild: ${guildId} \n ${TC.guild.id}`);
+				// !cfg.log.debug ? null : console.log(LOGTAG.DEBUG, "[OmegaBot:omMessage]", `Message Guild: ${guildId} \n ${TC.guild.id}`);
 				const WebHookName = (cfg.discord.hookname + TC.name.toUpperCase()).substr(0, 32);
 				TC.fetchWebhooks().then((WHC) => {
 					const WH = WHC.filter((wh) => wh.name === WebHookName).first();
@@ -249,6 +249,10 @@ export class OmegaBot extends WorkerProcess {
 					} else if (msg.content.startsWith("!add")) {
 						if (isAdmin) {
 							const [command, target, ...text] = msg.content.split(" ");
+							if(target=="help") {
+								msg.react("👎");
+								return;
+							}
 							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
 							let data = null;
 							try {
@@ -318,6 +322,22 @@ export class OmegaBot extends WorkerProcess {
 							msg.react("👎");
 							return;
 						}
+					} else if (msg.content.startsWith('?help')) {
+						const [command, value] = msg.content.split(" ");
+						return WH.sendMessage(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
+						\`\`\`\n
+						Kommandos für Administratoren:
+						!add [was?] [text]			| Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos\n
+						!remove [was?]				| Entferne alle Einträge zu [was] aus dem Speicher\n
+						!setStreamChannel			| Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen\n
+						!setAllowAll [true|false]	| Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]\n
+						!addStreamer @name @name... | Füge ein oder mehrere Streamer hinzu die ich ankündigen darf!\n
+						!removeStreamer @name		| Du kannst einen Streamer auch wieder entfernen, dann bleibe ich still\n
+						-------------------------------\n
+						Kommandos für alle anderen:\n
+						?help						| Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)\n
+						?[was?]						| Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)\n
+						\n\`\`\``, WHO);
 					} else if (msg.content.startsWith('?')) {
 						const name = msg.content.substr(1); // without ?
 						const datadir = resolve(__dirname, "..", "infos", guildId);
