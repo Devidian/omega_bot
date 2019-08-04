@@ -301,7 +301,7 @@ export class OmegaBot extends WorkerProcess {
 					}
 				} else if (msg.content.startsWith('?help')) {
 					const [command, value] = msg.content.split(" ");
-					return TC.sendMessage(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
+					return TC.send(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
 \`\`\`\n
 Kommandos für Administratoren:
 !add [was?] [text]          | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
@@ -329,12 +329,12 @@ Kommandos für alle anderen:
 						const data = JSON.parse(dataRaw.toString());
 						if (Array.isArray(data.data)) {
 							shuffle(data.data);
-							return TC.sendMessage(`Oha, zu ${name} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
+							return TC.send(`Oha, zu ${name} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
 						} else {
-							return TC.sendMessage(`Zu ${name} kann ich dir nur so viel sagen: \n${data.data}`);
+							return TC.send(`Zu ${name} kann ich dir nur so viel sagen: \n${data.data}`);
 						}
 					} catch (error) {
-						return TC.sendMessage("Darüber weiss ich überhaupt gar nichts!");
+						return TC.send("Darüber weiss ich überhaupt gar nichts!");
 					}
 				}
 
