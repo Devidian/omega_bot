@@ -138,6 +138,9 @@ export class OmegaBot extends WorkerProcess {
 							if (!this.announcementCache.has(G.id)) {
 								this.announcementCache.set(G.id, new Map<string, Game>());
 							}
+							if (!this.announcementDateCache.has(G.id)) {
+								this.announcementDateCache.set(G.id, new Map<string, Date>());
+							}
 							const aCache = this.announcementCache.get(G.id);
 							const aDateCache = this.announcementDateCache.get(G.id);
 							const blockTime = new Date();
