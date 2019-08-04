@@ -5,7 +5,15 @@
   - type `!addStreamer @name ...` to add streamers that should be announced
   - type `!setStreamChannel` in the channel that should be used for announcements
   - type `!setAllowAll true` to announce all streamers
-  - type `!removeStreamer @name` to remove streamer from streamer list 
+  - type `!removeStreamer @name ...` to remove streamer(s) from streamer list 
+- help! Type `?help` to get bot command help
+- new set-command for guild config
+  - type `!set allowAll true` to announce all streamers
+  - type `!set allowAll false` to only announce added streamers
+  - type `!set streamerChannel` to set announcement channel
+  - type `!set announcementDelayHours [number]` to set delay in hours for re-announcements
+  - type `!set name [name]` to change the bot nickname
+  - type `!set `
 
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)
