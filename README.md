@@ -9,8 +9,16 @@ Currently the format looks like this:
 }
 ```
 
+## Install
+```bash
+mkdir -p /srv/apps;
+cd /srv/apps;
+git clone git@github.com:Devidian/flamongo_discord_bot.git --branch OmegaBot OmegaBot;
+```
+
 ## Invitation Link
 
+HellBot:
 https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&permissions=604056640
 
 ## Usage

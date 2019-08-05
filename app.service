@@ -3,8 +3,8 @@ Description=OmegaBot - Discord Bot Unit
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/main.js config
-ExecReload=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/app-cli.js REBOOT
+ExecStart=/usr/bin/nodejs /srv/apps/OmegaBot/bin/main.js config
+ExecReload=/usr/bin/nodejs /srv/apps/OmegaBot/bin/app-cli.js REBOOT
 Restart=always
 StandardOutput=syslog
 StandardError=syslog
