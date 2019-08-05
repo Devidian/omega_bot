@@ -247,7 +247,7 @@ export class OmegaBot extends WorkerProcess {
 				const GuildConfig = this.guildConfigList.get(guildId)
 				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = GuildConfig;
 
-				const [command, args] = msg.content.split(" ", 2);
+				const [command, ...args] = msg.content.split(" ");
 
 				if (command.startsWith('!')) {
 					if (!isAdmin) {
@@ -257,7 +257,7 @@ export class OmegaBot extends WorkerProcess {
 					}
 					switch (command) {
 						case "!remove": {
-							const file = resolve(process.cwd(), "infos", guildId, args.toLowerCase() + ".json");
+							const file = resolve(process.cwd(), "infos", guildId, args.join(" ").toLowerCase() + ".json");
 							try {
 								unlinkSync(file);
 								msg.react("👍");
@@ -266,7 +266,7 @@ export class OmegaBot extends WorkerProcess {
 							}
 						} break;
 						case "!add": {
-							const [target, text] = args.split(" ", 2);
+							const [target, ...text] = args;
 							if (target == "help") {
 								msg.react("👎");
 								return;
@@ -308,12 +308,12 @@ export class OmegaBot extends WorkerProcess {
 							this.saveGuildSettings(guildId, msg);
 						} break;
 						case "!setAllowAll": {
-							const to = args == "true";
+							const to = args[0] == "true";
 							GuildConfig.allowAll = to;
 							this.saveGuildSettings(guildId, msg);
 						} break;
 						case "set": {
-							const [prop, options] = args.split(" ", 2);
+							const [prop, options] = args;
 							switch (prop) {
 								case "allowAll": {
 									GuildConfig.allowAll = options == "true";
