@@ -1,6 +1,6 @@
 'use strict';
 import { Client, Game, Guild, Message, Permissions, TextChannel } from "discord.js";
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync, accessSync } from "fs";
 import { resolve } from "path";
 import { Logger } from "../lib/tools/Logger";
 import { NodeConfig } from "../config";
@@ -134,6 +134,16 @@ export class OmegaBot extends WorkerProcess {
 			streamerChannelId: null,
 			streamerList: []
 		};
+		const dataPath = resolve(process.cwd(), "infos", guildId);
+		try {
+			accessSync(dataPath);
+		} catch (error) {
+			try {
+				mkdirSync(dataPath, { recursive: true });
+			} catch (error) {
+				Logger(911,"OmegaBot:loadGuildSettings",`Unable to create data-directory ${dataPath}`);
+			}
+		}
 		try {
 			const file = resolve(process.cwd(), "infos", guildId + ".json");
 			try {
