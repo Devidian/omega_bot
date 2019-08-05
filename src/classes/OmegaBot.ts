@@ -141,7 +141,7 @@ export class OmegaBot extends WorkerProcess {
 			try {
 				mkdirSync(dataPath, { recursive: true });
 			} catch (error) {
-				Logger(911,"OmegaBot:loadGuildSettings",`Unable to create data-directory ${dataPath}`);
+				Logger(911, "OmegaBot:loadGuildSettings", `Unable to create data-directory ${dataPath}`);
 			}
 		}
 		try {
@@ -209,7 +209,9 @@ export class OmegaBot extends WorkerProcess {
 								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList.includes(Member.id))) {
 									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 									try {
-										!txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
+										let msg = announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
+										// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
+										!txtCh ? null : txtCh.send(msg);
 										aDateCache.set(Member.id, new Date());
 									} catch (error) {
 										Logger(911, "OmegaBot:setupDiscordBot", error);
@@ -338,6 +340,10 @@ export class OmegaBot extends WorkerProcess {
 									GuildConfig.announcementDelayHours = Number(options);
 									this.saveGuildSettings(guildId, msg);
 								} break;
+								case "announcementMsg": {
+									GuildConfig.announcerMessage = options;
+									this.saveGuildSettings(guildId, msg);
+								} break;
 								default:
 									msg.react("👎");
 									break;
@@ -352,11 +358,30 @@ export class OmegaBot extends WorkerProcess {
 					}
 
 				} else {// if(command.startsWith('?'))
-					const what = msg.content.substr(1); // without ?
+					const [what, ...options] = msg.content.split(" ");
 					switch (what) {
 						case "help":
-							TC.send(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
-\`\`\`\n
+							if (options.length) {
+								switch (options[0]) {
+									case "announcementMsg":
+										TC.send(`Also wenn du \`!set announcementMsg [text]\` verwendest kannst du in [text] folgende Platzhalter verwenden:
+\`\`\`
+PH_USERNAME     | Dieser Platzhalter wird durch den Namen des Streamer's ersetzt
+PH_GAME_NAME    | Dieser Platzhalter zeigt den namen des Streams an
+PH_GAME_DETAIL  | Dieser Platzhalter zeigt das Spiel an, welches gestreamt wird
+PH_GAME_URL     | Dieser Platzhalter wird durch einen Link zum Stream ersetzt
+\`\`\`										
+										`);
+
+										break;
+
+									default:
+										break;
+								}
+							} else {
+
+								TC.send(`Oh, du hast die Kommandos vergessen? Hier Bitte:
+\`\`\`
 Kommandos für Administratoren:
 !add [was?] [text]                   | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
 !remove [was?]                       | Entferne alle Einträge zu [was] aus dem Speicher
@@ -368,25 +393,26 @@ Kommandos für Administratoren:
 !set allowAll [true|false]           | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
 !set streamerChannel                 | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
 !set announcementDelayHours [number] | Damit stellst du ein wie lange ich still bleiben soll nachdem ich einen Streamer angekündigt habe!
+!set announcementMsg [text]			 | Oh das ist komplex versuch mal ?help announcementMsg
 -------------------------------
 Kommandos für alle anderen:
 ?help                                | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
 ?[was?]                              | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
-\n\`\`\``);
-							break;
+\`\`\``);
+							} break;
 
 						default: {
 
 							const datadir = resolve(process.cwd(), "infos", guildId);
-							const file = resolve(datadir, what.toLowerCase() + ".json");
+							const file = resolve(datadir, what.replace("?", "").toLowerCase() + ".json");
 							try {
 								const dataRaw = readFileSync(file);
 								const data = JSON.parse(dataRaw.toString());
 								if (Array.isArray(data.data)) {
 									shuffle(data.data);
-									TC.send(`Oha, zu ${what} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
+									TC.send(`Oha, zu ${what.replace("?", "")} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
 								} else {
-									TC.send(`Zu ${what} kann ich dir nur so viel sagen: \n${data.data}`);
+									TC.send(`Zu ${what.replace("?", "")} kann ich dir nur so viel sagen: \n${data.data}`);
 								}
 							} catch (error) {
 								TC.send("Darüber weiss ich überhaupt gar nichts!");
