@@ -1,0 +1,23 @@
+{
+    "log": {
+        "level": 0
+    },
+    "app": {
+        "title": "OmegaBot"
+    },
+    "cli": {
+        "port": 47110,
+        "commands": [
+            "REBOOT"
+        ]
+    },
+    "nodes": {
+        "omegabot": {
+            "default":{
+                "enabled": false,
+                "token": null,
+                "tick": 250
+            }
+        }
+    }
+}

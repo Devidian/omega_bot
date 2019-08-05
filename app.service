@@ -1,0 +1,17 @@
+[Unit]
+Description=OmegaBot - Discord Bot Unit
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/main.js config
+ExecReload=/usr/bin/nodejs /srv/apps/flamongo_discord_bot/bin/app-cli.js REBOOT
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=OBOT
+User=nodejs
+Group=nodejs
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

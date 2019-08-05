@@ -1,0 +1,18 @@
+{
+	"name": "omega_discord_bot",
+	"version": "0.3.0",
+	"scripts": {
+		"start": "node bin/main"
+	},
+	"private": true,
+	"dependencies": {
+		"discord.js": "^11.5.1",
+		"jdenticon": "^2.2.0",
+		"rxjs": "^6.5.2",
+		"ws": "^7.1.1"
+	},
+	"devDependencies": {
+		"@types/node": "^12.6.9",
+		"@types/ws": "^6.0.1"
+	}
+}
