@@ -312,7 +312,7 @@ export class OmegaBot extends WorkerProcess {
 							GuildConfig.allowAll = to;
 							this.saveGuildSettings(guildId, msg);
 						} break;
-						case "set": {
+						case "!set": {
 							const [prop, options] = args;
 							switch (prop) {
 								case "allowAll": {
@@ -358,16 +358,20 @@ export class OmegaBot extends WorkerProcess {
 							TC.send(`Oh, du hast die Kommandos vergessen? Hier Bitte:\n
 \`\`\`\n
 Kommandos für Administratoren:
-!add [was?] [text]          | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
-!remove [was?]              | Entferne alle Einträge zu [was] aus dem Speicher
-!setStreamChannel           | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
-!setAllowAll [true|false]   | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
-!addStreamer @name ...      | Füge ein oder mehrere Streamer hinzu die ich ankündigen darf!
-!removeStreamer @name ...   | Du kannst einen Streamer auch wieder entfernen, dann bleibe ich still
+!add [was?] [text]                   | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
+!remove [was?]                       | Entferne alle Einträge zu [was] aus dem Speicher
+!setStreamChannel                    | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
+!setAllowAll [true|false]            | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
+!addStreamer @name ...               | Füge ein oder mehrere Streamer hinzu die ich ankündigen darf!
+!removeStreamer @name ...            | Du kannst einen Streamer auch wieder entfernen, dann bleibe ich still
+!set name [name]                     | Du kannst meinen Nicknamen ändern wenn du möchtest :)
+!set allowAll [true|false]           | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
+!set streamerChannel                 | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
+!set announcementDelayHours [number] | Damit stellst du ein wie lange ich still bleiben soll nachdem ich einen Streamer angekündigt habe!
 -------------------------------
 Kommandos für alle anderen:
-?help                       | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
-?[was?]                     | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
+?help                                | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
+?[was?]                              | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
 \n\`\`\``);
 							break;
 
