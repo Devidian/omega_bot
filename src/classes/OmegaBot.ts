@@ -378,11 +378,6 @@ Kommandos für alle anderen:
 						default: {
 
 							const datadir = resolve(process.cwd(), "infos", guildId);
-							try {
-								mkdirSync(datadir);
-							} catch (error) {
-								Logger(911, "OmegaBot:setupDiscordBot", error);
-							}
 							const file = resolve(datadir, what.toLowerCase() + ".json");
 							try {
 								const dataRaw = readFileSync(file);
