@@ -102,7 +102,7 @@ export class OmegaBot extends WorkerProcess {
 		};
 
 		try {
-			const file = resolve(__dirname, "..", "infos", guildId + ".json");
+			const file = resolve(process.cwd(), "infos", guildId + ".json");
 			try {
 				writeFileSync(file, JSON.stringify(GuildConfig, null, 2));
 				!msg ? null : msg.react("👍");
@@ -135,7 +135,7 @@ export class OmegaBot extends WorkerProcess {
 			streamerList: []
 		};
 		try {
-			const file = resolve(__dirname, "..", "infos", guildId + ".json");
+			const file = resolve(process.cwd(), "infos", guildId + ".json");
 			try {
 				const dataRaw = readFileSync(file);
 				GuildConfig = JSON.parse(dataRaw.toString());
@@ -247,7 +247,7 @@ export class OmegaBot extends WorkerProcess {
 					}
 					switch (command) {
 						case "!remove": {
-							const file = resolve(__dirname, "..", "infos", guildId, args.toLowerCase() + ".json");
+							const file = resolve(process.cwd(), "infos", guildId, args.toLowerCase() + ".json");
 							try {
 								unlinkSync(file);
 								msg.react("👍");
@@ -261,7 +261,7 @@ export class OmegaBot extends WorkerProcess {
 								msg.react("👎");
 								return;
 							}
-							const file = resolve(__dirname, "..", "infos", guildId, target.toLowerCase() + ".json");
+							const file = resolve(process.cwd(), "infos", guildId, target.toLowerCase() + ".json");
 							let data = null;
 							try {
 								const dataRaw = readFileSync(file);
@@ -363,7 +363,7 @@ Kommandos für alle anderen:
 
 						default: {
 
-							const datadir = resolve(__dirname, "..", "infos", guildId);
+							const datadir = resolve(process.cwd(), "infos", guildId);
 							try {
 								mkdirSync(datadir);
 							} catch (error) {
