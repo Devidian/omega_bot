@@ -2,6 +2,8 @@
 
 ### Fixed
 - service now starts after `network.target` to prevent ENOTFOUND disordapp.com error
+### Changed
+- moved code for guild initialisation to new method
 ### Added
 - streamer Announcements!
   - type `!addStreamer @name ...` to add streamers that should be announced
@@ -17,6 +19,7 @@
   - type `!set name [name]` to change the bot nickname
   - type `!set `
 - submodule `OmegaLib` added to `src/lib`
+- bot calls guild initialisation on.guildCreate event and tries to say "hello" in the default channel
 
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)
@@ -25,7 +28,7 @@
 ### Added
 - Admins can add new text by typing `!add [target] [text]`. IMPORTANT: no whitespace support in target yet
 - Admins can remove a file (completely) by typing `!remove [target]`
-### changed
+### Changed
 - `data.data` can now be array, output will be shuffled
 
 ## [0.1.0] - 2019-04-08

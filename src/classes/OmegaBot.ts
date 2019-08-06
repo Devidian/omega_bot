@@ -3,7 +3,7 @@ import { Client, Game, Guild, Message, Permissions, TextChannel } from "discord.
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync, accessSync } from "fs";
 import { resolve } from "path";
 import { Logger } from "../lib/tools/Logger";
-import { NodeConfig } from "../config";
+import { NodeConfig, processType, processNodeId } from "../config";
 import { GuildConfiguration } from "../models/GuildConfiguration";
 import { WorkerProcess } from "./WorkerProcess";
 import { shuffle } from "../lib/tools/shuffle";
@@ -71,6 +71,8 @@ export class OmegaBot extends WorkerProcess {
 	 * @memberof OmegaBot
 	 */
 	protected run(): void {
+		const guilds = this.DiscordBot && this.DiscordBot.guilds ? this.DiscordBot.guilds.size : 0;
+		process.title = `OmegaBot: ${processNodeId} - ${guilds}`;
 		this.timer.refresh();
 	}
 
@@ -166,6 +168,61 @@ export class OmegaBot extends WorkerProcess {
 	 *
 	 *
 	 * @protected
+	 * @param {Guild} G
+	 * @memberof OmegaBot
+	 */
+	protected initGuild(G: Guild) {
+		this.loadGuildSettings(G.id);
+		const { botname } = this.guildConfigList.get(G.id);
+		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
+		Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
+		if (!this.streamerChecks.has(G.id)) {
+			this.streamerChecks.set(G.id, setTimeout(() => {
+				const Guild: Guild = G;
+
+				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
+
+				if (!streamerChannelId) return;
+
+				if (!this.announcementCache.has(G.id)) {
+					this.announcementCache.set(G.id, new Map<string, Game>());
+				}
+				if (!this.announcementDateCache.has(G.id)) {
+					this.announcementDateCache.set(G.id, new Map<string, Date>());
+				}
+				const aCache = this.announcementCache.get(G.id);
+				const aDateCache = this.announcementDateCache.get(G.id);
+				const blockTime = new Date();
+				blockTime.setHours(blockTime.getHours() - (announcementDelayHours || 5));
+
+				Guild.members.forEach((Member, key) => {
+					const Game = Member.presence.game;
+					const lastGame = aCache.get(Member.id);
+					const liveDate = aDateCache.get(Member.id);
+					if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList.includes(Member.id))) {
+						const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
+						try {
+							let msg = announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
+							// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
+							// @everyone Aufgepasst ihr Seelen! `PH_USERNAME` streamt gerade!\n`PH_GAME_NAME` - `PH_GAME_DETAIL`\nSiehe hier: PH_GAME_URL
+							!txtCh ? null : txtCh.send(msg);
+							aDateCache.set(Member.id, new Date());
+						} catch (error) {
+							Logger(911, "OmegaBot:setupDiscordBot", error);
+						}
+					}
+					aCache.set(Member.id, Game);
+				});
+				this.announcementCache.set(G.id, aCache);
+				this.streamerChecks.get(G.id).refresh();
+			}, 5000));
+		}
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
 	 * @returns {void}
 	 * @memberof OmegaBot
 	 */
@@ -179,54 +236,19 @@ export class OmegaBot extends WorkerProcess {
 				Logger(111, "OmegaBot:setupDiscordBot", `Logged in as ${this.DiscordBot.user.tag}!`);
 
 				this.DiscordBot.guilds.forEach((G, key) => {
-					this.loadGuildSettings(G.id);
-					const { botname } = this.guildConfigList.get(G.id);
-					if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
-					Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
-					if (!this.streamerChecks.has(key)) {
-						this.streamerChecks.set(key, setTimeout(() => {
-							const Guild: Guild = G;
-
-							const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
-
-							if (!streamerChannelId) return;
-
-							if (!this.announcementCache.has(G.id)) {
-								this.announcementCache.set(G.id, new Map<string, Game>());
-							}
-							if (!this.announcementDateCache.has(G.id)) {
-								this.announcementDateCache.set(G.id, new Map<string, Date>());
-							}
-							const aCache = this.announcementCache.get(G.id);
-							const aDateCache = this.announcementDateCache.get(G.id);
-							const blockTime = new Date();
-							blockTime.setHours(blockTime.getHours() - (announcementDelayHours || 5));
-
-							Guild.members.forEach((Member, key) => {
-								const Game = Member.presence.game;
-								const lastGame = aCache.get(Member.id);
-								const liveDate = aDateCache.get(Member.id);
-								if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList.includes(Member.id))) {
-									const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
-									try {
-										let msg = announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
-										// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
-										// @everyone Aufgepasst ihr Seelen! `PH_USERNAME` streamt gerade!\n`PH_GAME_NAME` - `PH_GAME_DETAIL`\nSiehe hier: PH_GAME_URL
-										!txtCh ? null : txtCh.send(msg);
-										aDateCache.set(Member.id, new Date());
-									} catch (error) {
-										Logger(911, "OmegaBot:setupDiscordBot", error);
-									}
-								}
-								aCache.set(Member.id, Game);
-							});
-							this.announcementCache.set(G.id, aCache);
-							this.streamerChecks.get(key).refresh();
-						}, 5000));
-					}
+					this.initGuild(G);
 				});
 			});
 
+			this.DiscordBot.on("guildCreate", (guild) => {
+				this.initGuild(guild);
+				try {
+					guild.defaultChannel.send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
+
+				} catch (error) {
+					Logger(911, "DiscordBot.on->guildCreate", error);
+				}
+			});
 
 
 			this.DiscordBot.on('message', async msg => {
