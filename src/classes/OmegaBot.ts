@@ -339,16 +339,16 @@ export class OmegaBot extends WorkerProcess {
 							this.saveGuildSettings(guildId, msg);
 						} break;
 						case "!set": {
-							const [prop, options] = args;
+							const [prop, ...options] = args;
 							switch (prop) {
 								case "allowAll": {
-									GuildConfig.allowAll = options == "true";
+									GuildConfig.allowAll = options[0] == "true";
 									this.saveGuildSettings(guildId, msg);
 								} break;
 								case "name": {
-									GuildConfig.botname = options;
+									GuildConfig.botname = options.join(" ");
 									if (me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) {
-										me.setNickname(options);
+										me.setNickname(options.join(" "));
 										TC.send(`Okay, dann heiße ich nun *${options}* für dich!`);
 										this.saveGuildSettings(guildId, msg);
 									} else {
@@ -365,7 +365,7 @@ export class OmegaBot extends WorkerProcess {
 									this.saveGuildSettings(guildId, msg);
 								} break;
 								case "announcementMsg": {
-									GuildConfig.announcerMessage = options;
+									GuildConfig.announcerMessage = options.join(" ");
 									this.saveGuildSettings(guildId, msg);
 								} break;
 								default:
