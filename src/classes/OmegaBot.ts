@@ -244,7 +244,7 @@ export class OmegaBot extends WorkerProcess {
 				this.initGuild(guild);
 				try {
 					Logger(110, "DiscordBot.on->guildCreate", `Just joined new Guild ${guild.name} with ${guild.memberCount} members`);
-					const publicCH = guild.channels.filter((GC) => GC.type == "text" && GC.permissionsFor(guild.me).hasPermission("SEND_MESSAGES"));
+					const publicCH = guild.channels.filter((GC) => GC.type == "text" && GC.permissionsFor(guild.me).has("SEND_MESSAGES"));
 					(<TextChannel>guild.systemChannel || <TextChannel>publicCH.random()).send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
 				} catch (error) {
 					Logger(911, "DiscordBot.on->guildCreate", error);
