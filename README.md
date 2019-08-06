@@ -41,4 +41,5 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 |!set name [name]|set bot nickname to [name]|Administrators|
 |!set streamerChannel|set streamer channel to this channel|Administrators|
 |!set announcementDelayHours [number]|set announcement delay to [number] hours|Administrators|
+|!set announcementMsg [text]|set announcement message|Administrators|
 |!set ||Administrators|

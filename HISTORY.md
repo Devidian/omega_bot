@@ -18,9 +18,10 @@
   - type `!set streamerChannel` to set announcement channel
   - type `!set announcementDelayHours [number]` to set delay in hours for re-announcements
   - type `!set name [name]` to change the bot nickname
-  - type `!set `
+  - type `!set announcementMsg [text]` to set the announcement message
 - submodule `OmegaLib` added to `src/lib`
 - bot calls guild initialisation on.guildCreate event and tries to say "hello" in the default channel
+- `?wiki [page]` creates a link to wikipedia
 
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)

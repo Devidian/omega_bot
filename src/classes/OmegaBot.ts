@@ -293,7 +293,7 @@ export class OmegaBot extends WorkerProcess {
 						} break;
 						case "!add": {
 							const [target, ...text] = args;
-							if (target == "help") {
+							if (["help", "wiki"].includes(target)) {
 								msg.react("👎");
 								return;
 							}
@@ -384,6 +384,9 @@ export class OmegaBot extends WorkerProcess {
 				} else {// if(command.startsWith('?'))
 					const [what, ...options] = msg.content.split(" ");
 					switch (what) {
+						case "?wiki": {
+							TC.send(`Versuchs mal hier: https://de.wikipedia.org/wiki/${options[0]}`);
+						} break;
 						case "?help":
 							if (options.length) {
 								switch (options[0]) {
@@ -417,10 +420,11 @@ Kommandos für Administratoren:
 !set allowAll [true|false]           | Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]
 !set streamerChannel                 | Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen
 !set announcementDelayHours [number] | Damit stellst du ein wie lange ich still bleiben soll nachdem ich einen Streamer angekündigt habe!
-!set announcementMsg [text]			 | Oh das ist komplex versuch mal ?help announcementMsg
+!set announcementMsg [text]	         | Oh das ist komplex versuch mal ?help announcementMsg
 -------------------------------
 Kommandos für alle anderen:
 ?help                                | Wenn du diese Hilfe hier mal wieder brauchst, sag einfach bescheid :)
+?wiki [was?]                         | Ich werde dir einen Link zur wikipedia Seite geben, ob er funktioniert musst du selber testen!
 ?[was?]                              | Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
 \`\`\``);
 							} break;
