@@ -4,6 +4,7 @@
 - service now starts after `network.target` to prevent ENOTFOUND disordapp.com error
 ### Changed
 - moved code for guild initialisation to new method
+- removed prefix message from `?...`
 ### Added
 - streamer Announcements!
   - type `!addStreamer @name ...` to add streamers that should be announced

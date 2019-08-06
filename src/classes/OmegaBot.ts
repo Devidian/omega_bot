@@ -434,9 +434,9 @@ Kommandos für alle anderen:
 								const data = JSON.parse(dataRaw.toString());
 								if (Array.isArray(data.data)) {
 									shuffle(data.data);
-									TC.send(`Oha, zu ${what.replace("?", "")} fällt mir zum Beispiel das hier ein: \n${data.data[0]}`);
+									TC.send(data.data[0]);
 								} else {
-									TC.send(`Zu ${what.replace("?", "")} kann ich dir nur so viel sagen: \n${data.data}`);
+									TC.send(data.data);
 								}
 							} catch (error) {
 								TC.send(`Darüber (${what}) weiss ich überhaupt gar nichts!`);
