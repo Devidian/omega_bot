@@ -303,12 +303,12 @@ export class OmegaBot extends WorkerProcess {
 								const dataRaw = readFileSync(file);
 								data = JSON.parse(dataRaw.toString());
 								if (Array.isArray(data.data)) {
-									data.data.push(text);
+									data.data.push(text.join(" "));
 								} else {
-									data.data = [data.data, text];
+									data.data = [data.data, text.join(" ")];
 								}
 							} catch (error) {
-								data = { data: text };
+								data = { data: text.join(" ") };
 							}
 							writeFileSync(file, JSON.stringify(data, null, 2));
 							msg.react("👍");
