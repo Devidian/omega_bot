@@ -211,6 +211,7 @@ export class OmegaBot extends WorkerProcess {
 									try {
 										let msg = announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
 										// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
+										// @everyone Aufgepasst ihr Seelen! `PH_USERNAME` streamt gerade!\n`PH_GAME_NAME` - `PH_GAME_DETAIL`\nSiehe hier: PH_GAME_URL
 										!txtCh ? null : txtCh.send(msg);
 										aDateCache.set(Member.id, new Date());
 									} catch (error) {
@@ -360,7 +361,7 @@ export class OmegaBot extends WorkerProcess {
 				} else {// if(command.startsWith('?'))
 					const [what, ...options] = msg.content.split(" ");
 					switch (what) {
-						case "help":
+						case "?help":
 							if (options.length) {
 								switch (options[0]) {
 									case "announcementMsg":
@@ -370,7 +371,7 @@ PH_USERNAME     | Dieser Platzhalter wird durch den Namen des Streamer's ersetzt
 PH_GAME_NAME    | Dieser Platzhalter zeigt den namen des Streams an
 PH_GAME_DETAIL  | Dieser Platzhalter zeigt das Spiel an, welches gestreamt wird
 PH_GAME_URL     | Dieser Platzhalter wird durch einen Link zum Stream ersetzt
-\`\`\`										
+\`\`\`
 										`);
 
 										break;
@@ -415,7 +416,7 @@ Kommandos für alle anderen:
 									TC.send(`Zu ${what.replace("?", "")} kann ich dir nur so viel sagen: \n${data.data}`);
 								}
 							} catch (error) {
-								TC.send("Darüber weiss ich überhaupt gar nichts!");
+								TC.send(`Darüber (${what}) weiss ich überhaupt gar nichts!`);
 							}
 						} break;
 					}
