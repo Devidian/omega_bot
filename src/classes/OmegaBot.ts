@@ -275,7 +275,23 @@ export class OmegaBot extends WorkerProcess {
 
 				const [command, ...args] = msg.content.split(" ");
 
+				const commands = [
+					"!remove",
+					"!add",
+					"!addStreamer",
+					"!removeStreamer",
+					"!setStreamChannel",
+					"!setAllowAll",
+					"!set",
+					"!!clear"
+				];
+
 				if (command.startsWith('!')) {
+					if(!commands.includes(command)){
+						msg.react("👎");
+						TC.send(`Also dieser Befehl ist mir unbekannt! Probier doch mal \`?help\` `);
+						return;
+					}
 					if (!isAdmin) {
 						msg.react("👎");
 						TC.send(`Du hast nicht die benötigten Rechte um \`${command}\` auszuführen, versuch es erst gar nicht! Probier doch mal \`?help\` `);
@@ -373,7 +389,21 @@ export class OmegaBot extends WorkerProcess {
 									break;
 							}
 						} break;
-						case "": { } break;
+						case "!!clear": {
+							const check = TC.permissionsFor(TC.guild.me).has("MANAGE_MESSAGES");
+							if (check) {
+								TC.fetchMessages({ before: msg.id, limit: 100 }).then((msgList) => {
+									TC.send(`Alles klar Chef! Ich beginne mit den Aufräumarbeiten! Ich werde die letzten ${Math.min(msgList.size, 100)} Nachrichten löschen!`);
+									Logger(0, 'command:!!clear', `Found ${msgList.size} messages to delete`);
+									msgList.forEach((m: Message, k: string) => {
+										m.pinned ? null : m.delete();
+									});
+									msg.react("✔");
+								});
+							} else {
+								TC.send(`Tut mir leid, aber ich habe nicht die nötigen Rechte um hier sauber zu machen :'(`);
+							}
+						} break;
 						case "": { } break;
 						case "": { } break;
 						default:

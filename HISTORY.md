@@ -21,7 +21,8 @@
   - type `!set announcementMsg [text]` to set the announcement message
 - submodule `OmegaLib` added to `src/lib`
 - bot calls guild initialisation on.guildCreate event and tries to say "hello" in the default channel
-- `?wiki [page]` creates a link to wikipedia
+- new command: `?wiki [page]` creates a link to wikipedia
+- new command: `!!clear` removes up to 100 messages from the current channel
 
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)
