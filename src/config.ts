@@ -22,10 +22,10 @@ export interface BaseConfig extends Config {
     },
 }
 
-export const [cwd, app, configType, processType, processNodeId] = process.argv;
+export const [cwd, app, configType, ...appArguments] = process.argv;
+export const [processType, processNodeId] = appArguments;
 
 const C = ConfigLoader.getInstance<BaseConfig>(resolve(process.cwd(), "config"), configType || "config");
-// console.log(C);
 
 export var ocfg: BehaviorSubject<BaseConfig> = new BehaviorSubject<BaseConfig>(C.cfg);
 C.on("update", (C: BaseConfig) => ocfg.next(C));

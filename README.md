@@ -29,6 +29,7 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 |Command|Description|Permission|
 |-|-|-|
 |?help|print out help with command list|everyone|
+|!!clear|remove up to 100 messages|Administrators|
 |!add [what] [text]|Adds a new entry to [what]|Administrators|
 |!remove [what]|Remove everything from [what]|Administrators|
 |?[what]|print out information regarding [what], shuffle if multiple entries exist|everyone|

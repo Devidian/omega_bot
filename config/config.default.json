@@ -3,7 +3,15 @@
         "level": 0
     },
     "app": {
-        "title": "OmegaBot"
+        "title": "OmegaBot",
+		"service": {
+			"user": "nodejs",
+			"id": "OBOT",
+			"name": "omega-bot",
+			"desc": "OmegaBot - Discord Bot Unit",
+			"env": [],
+			"after": ["network.target"]
+		}
     },
     "cli": {
         "port": 47110,

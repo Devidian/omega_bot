@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+## [0.4.0] - 2019-08-29
 ### Fixed
 - service now starts after `network.target` to prevent ENOTFOUND disordapp.com error
 ### Changed
@@ -22,7 +23,10 @@
 - submodule `OmegaLib` added to `src/lib`
 - bot calls guild initialisation on.guildCreate event and tries to say "hello" in the default channel
 - new command: `?wiki [page]` creates a link to wikipedia
-- new command: `!!clear` removes up to 100 messages from the current channel
+- new command: `!!clear` removes all messages from the current channel (excluding the command)
+- Service initialization via node itself (just use `./app-init.sh` as before - as root)
+- new command: `!!upgrade` application update
+- new command: `!!setDeployKey PH_KEY|FILE_UPLOAD` to update ssh-deploy-key for git
 
 ## [0.3.0] - 2019-07-31
 - Fork (new orphan branch) for hellbot (TODO: create one bot for all)
