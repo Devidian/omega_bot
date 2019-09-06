@@ -1,12 +1,13 @@
 'use strict';
-import { Client, Game, Guild, Message, Permissions, TextChannel } from "discord.js";
+import { Client, Game, Guild, Message, Permissions, TextChannel, Attachment } from "discord.js";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync, accessSync } from "fs";
 import { resolve } from "path";
 import { Logger } from "../lib/tools/Logger";
-import { NodeConfig, processType, processNodeId } from "../config";
+import { NodeConfig, processType, processNodeId, rootDir } from "../config";
 import { GuildConfiguration } from "../models/GuildConfiguration";
 import { WorkerProcess } from "./WorkerProcess";
 import { shuffle } from "../lib/tools/shuffle";
+import { EOL } from "os";
 
 interface BotMethod {
 	(msg: Message, args?: string[]): void
@@ -118,7 +119,7 @@ export class OmegaBot extends WorkerProcess {
 		};
 
 		try {
-			const file = resolve(process.cwd(), "infos", guildId + ".json");
+			const file = resolve(rootDir, "infos", guildId + ".json");
 			try {
 				writeFileSync(file, JSON.stringify(GuildConfig, null, 2));
 				!msg ? null : msg.react("👍");
@@ -152,7 +153,7 @@ export class OmegaBot extends WorkerProcess {
 			streamerMessages: {},
 			commandPermissions: {}
 		};
-		const dataPath = resolve(process.cwd(), "infos", guildId);
+		const dataPath = resolve(rootDir, "infos", guildId);
 		try {
 			accessSync(dataPath);
 		} catch (error) {
@@ -163,7 +164,7 @@ export class OmegaBot extends WorkerProcess {
 			}
 		}
 		try {
-			const file = resolve(process.cwd(), "infos", guildId + ".json");
+			const file = resolve(rootDir, "infos", guildId + ".json");
 			try {
 				const dataRaw = readFileSync(file);
 				GuildConfig = JSON.parse(dataRaw.toString());
@@ -243,6 +244,33 @@ export class OmegaBot extends WorkerProcess {
 	 */
 	protected setupBotCommands(): void {
 
+		this.availableBotCommands.set("?info", {
+			restricted: false,
+			method: (msg, [type, ...other]) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const streamChannel = msg.guild.channels.get(GuildConfig.streamerChannelId);
+				if (type.toLowerCase() == "streamer") {
+					const response = `Aktuell ist folgendes für Streamer eingestellt:
+\`\`\`ini
+Kanal    = ${GuildConfig.streamerChannelId} (${streamChannel ? streamChannel.name : "nicht gesetzt!"})
+Alle     = ${GuildConfig.allowAll ? "ja" : "nein"}
+Streamer = ${GuildConfig.streamerList.map(v=>v+` ( ${msg.guild.members.get(v).displayName} )`)}
+Delay    = ${GuildConfig.announcementDelayHours} Stunden
+Meldung  = ${GuildConfig.announcerMessage||"standard (nichts angegeben)"}
+\`\`\`
+`;
+					let attachment: Attachment = response.length > 1900 ? new Attachment(response, "info.md") : null;
+					TC.send(response.length > 1900 ? "Meine Antwort wäre zu lang, daher hab ich dir eine info datei zusammengestellt." : response, attachment);
+				} else {
+					TC.send(`Hm was? versuch mal \`?help\``);
+				}
+			},
+			help: `?info [type]`.padEnd(40, " ") + `| Mit diesem Befehl zeige ich dir Informationen über [type] wobei type derzeit folgende Werte annehmen kann: streamer`,
+			helpId: "HELP_INFO"
+		})
+
 		this.availableBotCommands.set("?help", {
 			restricted: false,
 			method: (msg, [what, ...options]) => {
@@ -256,8 +284,7 @@ PH_GAME_DETAIL  | Dieser Platzhalter zeigt das Spiel an, welches gestreamt wird
 PH_GAME_URL     | Dieser Platzhalter wird durch einen Link zum Stream ersetzt
 \`\`\``);
 				} else {
-
-					TC.send(`Oh, du hast die Kommandos vergessen? Hier Bitte:
+					const response = `Oh, du hast die Kommandos vergessen? Hier Bitte:
 \`\`\`
 Kommandos für Administratoren und berechtigte Personen:
 ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && v.restricted).map(v => v.help).join("\n")}
@@ -265,7 +292,28 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && v.res
 Kommandos für alle anderen:
 ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.restricted).map(v => v.help).join("\n")}\n`
 						+ `?[was]`.padEnd(40, " ") + `| Ich werde dir zeigen was ich zu [was?] weiss, wenn ich nichts weiss, sag ichs dir auch ;)
-\`\`\``);
+\`\`\``;
+					const responseList: string[] = [];
+					let index = 0;
+					if (response.length > 1900) {
+						let tmp = response.split(EOL);
+						Logger(0, "?help", `response length ${response.length} splitting response into ${tmp.length} pieces for rejoining`);
+						while (tmp.length) {
+							if (!responseList[index]) responseList[index] = index < 1 ? "" : "```";
+							let nextLength = responseList[index].length + tmp[0].length;
+							if (nextLength > 1900) {
+								responseList[index] += "```";
+								TC.send(responseList[index]);
+								index++;
+							} else {
+								responseList[index] += EOL + tmp.shift();
+							}
+						}
+						TC.send(responseList[index]);
+					} else {
+						TC.send(response);
+					}
+
 				}
 				/*
 !add [was] [text]                    | Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos
@@ -313,7 +361,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 			method: (msg, options) => {
 				// const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
-				const file = resolve(process.cwd(), "infos", guildId, options.join(" ").toLowerCase() + ".json");
+				const file = resolve(rootDir, "infos", guildId, options.join(" ").toLowerCase() + ".json");
 				try {
 					unlinkSync(file);
 					msg.react("👍");
@@ -332,11 +380,11 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				// const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
 				const [target, ...text] = options;
-				if (["help", "wiki"].includes(target)) {
+				if (["help", "wiki", "info"].includes(target)) {
 					msg.react("👎");
 					return;
 				}
-				const file = resolve(process.cwd(), "infos", guildId, target.toLowerCase() + ".json");
+				const file = resolve(rootDir, "infos", guildId, target.toLowerCase() + ".json");
 				let data = null;
 				try {
 					const dataRaw = readFileSync(file);
@@ -551,7 +599,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 						msg.react("👎");
 						TC.send(`Also dieser Befehl ist mir unbekannt! Probier doch mal \`?help\` `);
 					} else {
-						const datadir = resolve(process.cwd(), "infos", guildId);
+						const datadir = resolve(rootDir, "infos", guildId);
 						const file = resolve(datadir, command.replace("?", "").toLowerCase() + ".json");
 						try {
 							const dataRaw = readFileSync(file);
@@ -612,6 +660,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 	protected clearTextChannel(TC: TextChannel, m: Message, d: number = 0): void {
 		const startId = TC.lastMessageID;
 		const startMsg = TC.lastMessage;
+		const Author = m.author;
 
 		TC.fetchMessages({ before: startId, limit: 100 }).then(async (msgList) => {
 			Logger(11, "OmegaBot.clearTextChannel", `Found ${msgList.size} messages in ${TC.guild.name}/${TC.name} to delete`);
@@ -629,25 +678,25 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 			const reactionNumbers = ["\u0030\u20E3", "\u0031\u20E3", "\u0032\u20E3", "\u0033\u20E3", "\u0034\u20E3", "\u0035\u20E3", "\u0036\u20E3", "\u0037\u20E3", "\u0038\u20E3", "\u0039\u20E3"];// ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 			if (idList.length > 99) { this.clearTextChannel(TC, m, total); } else {
 				// we are done
-				try {
-					await m.react("🇩");
-					await m.react("🇴");
-					await m.react("🇳");
-					await m.react("🇪");
-					await m.react(encodeURIComponent("\u25B6"));
-				} catch (e) {
-					Logger(911, "OmegaBot.clearTextChannel", e.message);
-				}
 
-				const totalDigits = total.toString().split("").map((s) => Number(s));
+				m.channel.send(`Okay <@!${m.author.id}>, ich habe \`${total}\` Nachrichten aus dem Kanal \`${TC.name}\` entfernt!`);
+				// try {
+				// 	await m.react("🇩");
+				// 	await m.react("🇴");
+				// 	await m.react("🇳");
+				// 	await m.react("🇪");
+				// 	await m.react(encodeURIComponent("\u25B6"));
+				// } catch (e) {
+				// 	Logger(911, "OmegaBot.clearTextChannel", e.message);
+				// }
 
-				for (let i = 0; i < totalDigits.length; i++) {
-					const digit = totalDigits[i];
-					const emoji = encodeURIComponent(reactionNumbers[digit]);
-					await m.react(emoji).catch(e => Logger(911, "OmegaBot.clearTextChannel", e.message, emoji, digit));
-				}
+				// const totalDigits = total.toString().split("").map((s) => Number(s));
 
-
+				// for (let i = 0; i < totalDigits.length; i++) {
+				// 	const digit = totalDigits[i];
+				// 	const emoji = encodeURIComponent(reactionNumbers[digit]);
+				// 	await m.react(emoji).catch(e => Logger(911, "OmegaBot.clearTextChannel", e.message, emoji, digit));
+				// }
 			}
 		});
 	}

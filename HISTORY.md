@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.5.0] - 2019-09-06
+### Changed
+- removed node v12 incompatible optional peer dependencies
+- changed from npm to yarn
+- `!!clear` command prints out who executed the command and does not react with DONE>000 anymore
+### Added
+- new command `?info [type]` where type is currently only `streamer`
+### Fixed
+- as `?help` gets to lengthy, the bot will split it into multiple messages.
+
 ## [0.4.0] - 2019-08-29
 ### Fixed
 - service now starts after `network.target` to prevent ENOTFOUND disordapp.com error
