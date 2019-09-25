@@ -19,10 +19,10 @@ git clone git@github.com:Devidian/flamongo_discord_bot.git --branch OmegaBot Ome
 ## Invitation Link
 
 HellBot:
-https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&permissions=67365952
+https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&permissions=335801408
 
 OmegaBot:
-https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&permissions=67365952
+https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&permissions=335801408
 
 ## Usage
 

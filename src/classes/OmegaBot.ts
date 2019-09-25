@@ -222,7 +222,7 @@ export class OmegaBot extends WorkerProcess {
 					if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList.includes(Member.id))) {
 						const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
 						try {
-							let msg = announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
+							let msg = !announcerMessage ? `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL` : announcerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
 							// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
 							// @everyone Aufgepasst ihr Seelen! `PH_USERNAME` streamt gerade!\n`PH_GAME_NAME` - `PH_GAME_DETAIL`\nSiehe hier: PH_GAME_URL
 							!txtCh ? null : txtCh.send(msg);
@@ -561,7 +561,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const GuildConfig = this.guildConfigList.get(guildId);
 				// const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
 				const Author = msg.author;
-				const roleNames: string[] = msg.guild.roles.filter((R) => GuildConfig.selfPromotionRoles.includes(R.id)).map((R) => "`"+R.name+"`");
+				const roleNames: string[] = msg.guild.roles.filter((R) => GuildConfig.selfPromotionRoles.includes(R.id)).map((R) => "`" + R.name + "`");
 				roleNames.length < 1 ? null : TC.send(`Hey <@!${Author.id}>! Folgende Rollen kann ich vergeben/nehmen: ${roleNames.join(', ')}`);
 				// roleNamesWarn.length<1?null: TC.send(`ACHTUNG! Folgende Rollen sind über meinem Niveau: ${roleNamesWarn.join(', ')}`);
 			},

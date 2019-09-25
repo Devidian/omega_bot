@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.6.1] - 2019-25-09
+### Fixed
+- no default announcer error!
+
 ## [0.6.0] - 2019-25-09
 ### Fixed
 - save guild file when joining new guild
