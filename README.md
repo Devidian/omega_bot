@@ -28,19 +28,27 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 
 |Command|Description|Permission|
 |-|-|-|
+|`BASICS`|||
 |?help|print out help with command list|everyone|
-|!!clear|remove up to 100 messages|Administrators|
+|!set name [name]|set bot nickname to [name]|Administrators|
+|!!clear|remove al messages in the current channel|Administrators|
 |!add [what] [text]|Adds a new entry to [what]|Administrators|
 |!remove [what]|Remove everything from [what]|Administrators|
 |?[what]|print out information regarding [what], shuffle if multiple entries exist|everyone|
-|!addStreamer @name ...|Add one or more streamer|Administrators|
+|`STREAMING STUFF`|||
 |!setStreamChannel|Set the channel as announcement channel|Administrators|
-|!setAllowAll true/false|set true if you want all members streaming to be announced|Administrators|
+|!addStreamer @name ...|Add one or more streamer|Administrators|
 |!removeStreamer @name|remove a streamer from streaming whitelist|Administrators|
+|!setAllowAll true/false|set true if you want all members streaming to be announced|Administrators|
 |!set allowAll true|everybody is announced when streaming|Administrators|
 |!set allowAll false|only added streamers are announced when streaming|Administrators|
-|!set name [name]|set bot nickname to [name]|Administrators|
 |!set streamerChannel|set streamer channel to this channel|Administrators|
 |!set announcementDelayHours [number]|set announcement delay to [number] hours|Administrators|
 |!set announcementMsg [text]|set announcement message|Administrators|
 |!set ||Administrators|
+|`ROLE MANAGEMENT`|||
+|!rolesAdd @role ...||Administrators|
+|!rolesRemove @role ...||Administrators|
+|?roles||everyone|
+|!join @role||everyone|
+|!leave @role||everyone|

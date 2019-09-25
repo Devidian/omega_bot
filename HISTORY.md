@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+## [0.6.0] - 2019-25-09
+### Fixed
+- save guild file when joining new guild
+### Changed
+- moved developer access to config
+### Added
+- new commands for bot-role-management
+  - type `!rolesAdd @role ...` to add roles
+  - type `!rolesRemove @role ...` to remove roles
+  - type `?roles` to see all roles added to the bot
+  - type `!join @role` to join a role
+  - type `!leave @role` to leave a role
+
 ## [0.5.0] - 2019-09-06
 ### Changed
 - removed node v12 incompatible optional peer dependencies

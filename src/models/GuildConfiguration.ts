@@ -8,6 +8,7 @@ export interface GuildConfiguration {
 	announcementDelayHours: number,
 	announcerMessage: string,
 	botname: string,
+	selfPromotionRoles: string[],
 	commandPermissions: {
 		[command: string]: string[]	// list of member.id
 	}

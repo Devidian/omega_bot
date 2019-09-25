@@ -6,6 +6,7 @@ import { Config } from "./lib/models/Config";
 export interface NodeConfig {
     enabled: boolean,		        // if false this node wont boot
     token: string,
+    developerAccess: string[],
     tick: number,
     [key: string]: any
 }

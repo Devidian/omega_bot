@@ -24,6 +24,7 @@
             "default":{
                 "enabled": false,
                 "token": null,
+                "developerAccess": ["385696536949948428"],
                 "tick": 250
             }
         }

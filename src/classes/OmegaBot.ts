@@ -1,13 +1,13 @@
 'use strict';
-import { Client, Game, Guild, Message, Permissions, TextChannel, Attachment } from "discord.js";
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync, accessSync } from "fs";
+import { Attachment, Client, Game, Guild, Message, Permissions, TextChannel } from "discord.js";
+import { accessSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { EOL } from "os";
 import { resolve } from "path";
+import { NodeConfig, processNodeId, rootDir } from "../config";
 import { Logger } from "../lib/tools/Logger";
-import { NodeConfig, processType, processNodeId, rootDir } from "../config";
+import { shuffle } from "../lib/tools/shuffle";
 import { GuildConfiguration } from "../models/GuildConfiguration";
 import { WorkerProcess } from "./WorkerProcess";
-import { shuffle } from "../lib/tools/shuffle";
-import { EOL } from "os";
 
 interface BotMethod {
 	(msg: Message, args?: string[]): void
@@ -115,6 +115,7 @@ export class OmegaBot extends WorkerProcess {
 			streamerChannelId: null,
 			streamerList: [],
 			streamerMessages: {},
+			selfPromotionRoles: [],
 			commandPermissions: {}
 		};
 
@@ -151,6 +152,7 @@ export class OmegaBot extends WorkerProcess {
 			streamerChannelId: null,
 			streamerList: [],
 			streamerMessages: {},
+			selfPromotionRoles: [],
 			commandPermissions: {}
 		};
 		const dataPath = resolve(rootDir, "infos", guildId);
@@ -166,14 +168,15 @@ export class OmegaBot extends WorkerProcess {
 		try {
 			const file = resolve(rootDir, "infos", guildId + ".json");
 			try {
-				const dataRaw = readFileSync(file);
-				GuildConfig = JSON.parse(dataRaw.toString());
+				const dataRaw = readFileSync(file, { encoding: "utf-8" });
+				GuildConfig = Object.assign({}, GuildConfig, JSON.parse(dataRaw));
 				Logger(110, "OmegaBot:loadGuildSettings", `Guild <${guildId}> settings found and loaded!`);
 			} catch (error) {
 				Logger(510, "OmegaBot:loadGuildSettings", `Guild <${guildId}> not found set all to default`);
 			} finally {
 				this.settingsLoaded.set(guildId, true);
 				this.guildConfigList.set(guildId, GuildConfig);
+				this.saveGuildSettings(guildId);
 			}
 
 		} catch (error) {
@@ -256,9 +259,9 @@ export class OmegaBot extends WorkerProcess {
 \`\`\`ini
 Kanal    = ${GuildConfig.streamerChannelId} (${streamChannel ? streamChannel.name : "nicht gesetzt!"})
 Alle     = ${GuildConfig.allowAll ? "ja" : "nein"}
-Streamer = ${GuildConfig.streamerList.map(v=>v+` ( ${msg.guild.members.get(v).displayName} )`)}
+Streamer = ${GuildConfig.streamerList.map(v => v + ` ( ${msg.guild.members.get(v).displayName} )`)}
 Delay    = ${GuildConfig.announcementDelayHours} Stunden
-Meldung  = ${GuildConfig.announcerMessage||"standard (nichts angegeben)"}
+Meldung  = ${GuildConfig.announcerMessage || "standard (nichts angegeben)"}
 \`\`\`
 `;
 					let attachment: Attachment = response.length > 1900 ? new Attachment(response, "info.md") : null;
@@ -535,6 +538,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 			helpId: "HELP_CLEAR"
 		});
 
+		// TEMPLATE
+
 		this.availableBotCommands.set("!template", {
 			restricted: true,
 			devOnly: true,
@@ -543,6 +548,148 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 			},
 			help: `!template`.padEnd(40, " ") + "| Ähm.. das ist kein echtes Kommando...",
 			helpId: "HELP_TEMPLATE"
+		});
+
+		// Self promotion
+		// ?rolesInfo
+		this.availableBotCommands.set("?roles", {
+			restricted: false,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				// const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const Author = msg.author;
+				const roleNames: string[] = msg.guild.roles.filter((R) => GuildConfig.selfPromotionRoles.includes(R.id)).map((R) => "`"+R.name+"`");
+				roleNames.length < 1 ? null : TC.send(`Hey <@!${Author.id}>! Folgende Rollen kann ich vergeben/nehmen: ${roleNames.join(', ')}`);
+				// roleNamesWarn.length<1?null: TC.send(`ACHTUNG! Folgende Rollen sind über meinem Niveau: ${roleNamesWarn.join(', ')}`);
+			},
+			help: `?roles`.padEnd(40, " ") + "| Ich zeige dir welche Rollen ich verwalten darf, benutze `!join @role` um einer Rolle beizutreten.",
+			helpId: "HELP_ROLES_INFO"
+		});
+
+		this.availableBotCommands.set("!rolesAdd", {
+			restricted: true,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const roleNames: string[] = [];
+				// const roleNamesWarn: string[] = [];
+				const Author = msg.author;
+				msg.mentions.roles.array().forEach((Role) => {
+					if (Role.managed) {
+						TC.send(`ACHTUNG! Die Rolle \`${Role.name}\` wird von einem anderen Service verwaltet, die kann ich nicht vergeben`);
+						return;
+					}
+					if (Role.calculatedPosition >= BotRolePosition) {
+						// roleNamesWarn.push(Role.name);
+						TC.send(`UPS! Die Rolle \`${Role.name}\` ist über meinem Niveau, ich kann Sie nicht vergeben, sorry!`);
+						return;
+					}
+					if (!GuildConfig.selfPromotionRoles.includes(Role.id)) {
+						GuildConfig.selfPromotionRoles.push(Role.id);
+						roleNames.push(Role.name);
+
+					}
+				});
+				this.saveGuildSettings(guildId, msg);
+				roleNames.length < 1 ? null : TC.send(`Alles klar <@!${Author.id}>, ich werde jetzt Mitglieder erlauben folgenden Rollen beizutreten: ${roleNames.join(', ')}`);
+				// roleNamesWarn.length<1?null: TC.send(`ACHTUNG! Folgende Rollen sind über meinem Niveau: ${roleNamesWarn.join(', ')}`);
+			},
+			help: `!rolesAdd @role ...`.padEnd(40, " ") + "| Du kannst mir erlauben bestimmte Rollen an Mitglieder zu vergeben wenn diese '!join @role' verwenden - und ich die Rechte dazu habe",
+			helpId: "HELP_ROLES_ADD"
+		});
+
+		this.availableBotCommands.set("!rolesRemove", {
+			restricted: true,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				// const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const roleNames: string[] = [];
+				// const roleNamesWarn: string[] = [];
+				const Author = msg.author;
+				msg.mentions.roles.array().forEach((Role) => {
+					if (GuildConfig.selfPromotionRoles.includes(Role.id)) {
+						GuildConfig.selfPromotionRoles.splice(GuildConfig.selfPromotionRoles.indexOf(Role.id), 1);
+						roleNames.push(Role.name);
+
+						// if(Role.calculatedPosition>=BotRolePosition) {
+						// 	roleNamesWarn.push(Role.name);
+						// }
+					}
+				});
+				this.saveGuildSettings(guildId, msg);
+				roleNames.length < 1 ? null : TC.send(`Alles klar <@!${Author.id}>, ich werde jetzt Mitglieder nicht mehr erlauben folgenden Rollen beizutreten: ${roleNames.join(',')}`);
+				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+				if (!check) {
+					TC.send(`ACHTUNG! Ich habe nicht die nötigen Rechte um Rollen zu verwalten!`);
+				}
+			},
+			help: `!rolesRemove @role ...`.padEnd(40, " ") + "| Du kannst Rollen auch wieder entfernen",
+			helpId: "HELP_ROLES_REMOVE"
+		});
+
+		this.availableBotCommands.set("!join", {
+			restricted: false,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const Author = msg.author;
+				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+
+				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+				if (!check) {
+					TC.send(`ACHTUNG! Ich habe nicht die nötigen Rechte um Rollen zu verwalten!`);
+					return;
+				}
+
+				const Role = msg.mentions.roles.array()[0];
+				if (GuildConfig.selfPromotionRoles.includes(Role.id) && Role.position < BotRolePosition) {
+					msg.guild.member(Author).addRole(Role);
+					TC.send(`Alles klar <@!${Author.id}>, du bist jetzt in \`${Role.name}\`, herzlichen Glückwunsch!`);
+				} else {
+					TC.send(`Tut mir leid <@!${Author.id}>, die Rolle \`${Role.name}\` darf ich nicht verwalten.`);
+				}
+			},
+			help: `!join @role`.padEnd(40, " ") + "| Versuche einer Rolle beizutreten, ob es klappt sag ich dir schon!",
+			helpId: "HELP_ROLES_JOIN"
+		});
+
+		this.availableBotCommands.set("!leave", {
+			restricted: false,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const Author = msg.author;
+				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+
+				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+				if (!check) {
+					TC.send(`ACHTUNG! Ich habe nicht die nötigen Rechte um Rollen zu verwalten!`);
+					return;
+				}
+
+				const Role = msg.mentions.roles.array()[0];
+				if (GuildConfig.selfPromotionRoles.includes(Role.id) && Role.position < BotRolePosition) {
+					msg.guild.member(Author).removeRole(Role);
+					TC.send(`Alles klar <@!${Author.id}>, du bist jetzt nicht mehr in \`${Role.name}\``);
+				} else {
+					TC.send(`Tut mir leid <@!${Author.id}>, die Rolle \`${Role.name}\` darf ich nicht verwalten.`);
+				}
+			},
+			help: `!leave @role`.padEnd(40, " ") + "| du willst eine Rolle loswerden? Dann versuch es damit!",
+			helpId: "HELP_ROLES_LEAVE"
 		});
 	}
 
@@ -620,7 +767,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 
 				const author = msg.author;
 				const member = await msg.guild.fetchMember(author);
-				const isDeveloper = member.id == "385696536949948428";
+				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
 				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage, commandPermissions, streamerMessages } = GuildConfig;
