@@ -7,6 +7,7 @@ export interface GuildConfiguration {
 	streamerChannelId: string,
 	announcementDelayHours: number,
 	announcerMessage: string,
+	welcomeMessage: string,
 	botname: string,
 	selfPromotionRoles: string[],
 	commandPermissions: {

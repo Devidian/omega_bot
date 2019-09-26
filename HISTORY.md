@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.7.0] - 2019-26-09
+### Added
+- new commands
+  - type `set welcomeMsg [text]` to change the bot-welcome message when new members join the server
+  - type `!!export` to get a downloadable json file with all guild configurations
+
 ## [0.6.1] - 2019-25-09
 ### Fixed
 - no default announcer error!

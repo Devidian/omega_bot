@@ -31,7 +31,9 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 |`BASICS`|||
 |?help|print out help with command list|everyone|
 |!set name [name]|set bot nickname to [name]|Administrators|
-|!!clear|remove al messages in the current channel|Administrators|
+|!set welcomeMsg [text]|set member welcome message|Administrators|
+|!!clear|remove all messages in the current channel|Administrators|
+|!!export|send guild data as json attachment|Administrators|
 |!add [what] [text]|Adds a new entry to [what]|Administrators|
 |!remove [what]|Remove everything from [what]|Administrators|
 |?[what]|print out information regarding [what], shuffle if multiple entries exist|everyone|

@@ -1,5 +1,5 @@
 'use strict';
-import { Attachment, Client, Game, Guild, Message, Permissions, TextChannel } from "discord.js";
+import { Attachment, Client, Game, Guild, Message, Permissions, TextChannel, GuildMember } from "discord.js";
 import { accessSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { EOL } from "os";
 import { resolve } from "path";
@@ -111,6 +111,7 @@ export class OmegaBot extends WorkerProcess {
 			allowAll: false,
 			announcementDelayHours: 5,
 			announcerMessage: null,
+			welcomeMessage: null,
 			botname: "OmegaBot",
 			streamerChannelId: null,
 			streamerList: [],
@@ -148,6 +149,7 @@ export class OmegaBot extends WorkerProcess {
 			allowAll: false,
 			announcementDelayHours: 5,
 			announcerMessage: null,
+			welcomeMessage: null,
 			botname: "OmegaBot",
 			streamerChannelId: null,
 			streamerList: [],
@@ -196,9 +198,18 @@ export class OmegaBot extends WorkerProcess {
 		const { botname } = this.guildConfigList.get(G.id);
 		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
 		Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
+
+		G.client.on("guildMemberAdd", (M: GuildMember) => {
+			const { welcomeMessage } = this.guildConfigList.get(G.id);
+			const msg = welcomeMessage || "Herzlich willkommen <@!PH_MEMBER_ID>";
+			(G.systemChannel as TextChannel).send(msg.replace("PH_MEMBER_NAME", M.displayName).replace("PH_MEMBER_ID", M.id));
+		});
+
 		if (!this.streamerChecks.has(G.id)) {
 			this.streamerChecks.set(G.id, setTimeout(() => {
 				const Guild: Guild = G;
+
+
 
 				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
 
@@ -509,6 +520,10 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 						GuildConfig.announcerMessage = args.join(" ");
 						this.saveGuildSettings(guildId, msg);
 					} break;
+					case "welcomeMsg": {
+						GuildConfig.welcomeMessage = args.join(" ");
+						this.saveGuildSettings(guildId, msg);
+					} break;
 					default:
 						msg.react("👎");
 						break;
@@ -518,7 +533,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				+ `!set allowAll [true|false]`.padEnd(40, " ") + `| Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]\n`
 				+ `!set streamerChannel`.padEnd(40, " ") + `| Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen\n`
 				+ `!set announcementDelayHours [number]`.padEnd(40, " ") + `| Damit stellst du ein wie lange ich still bleiben soll nachdem ich einen Streamer angekündigt habe!\n`
-				+ `!set announcementMsg [text]`.padEnd(40, " ") + `| Oh das ist komplex versuch mal ?help announcementMsg`,
+				+ `!set announcementMsg [text]`.padEnd(40, " ") + `| Oh das ist komplex versuch mal ?help announcementMsg\n`
+				+ `!set welcomeMsg [text]`.padEnd(40, " ") + `| Damit kannst du den Willkommenstext für neue Mitglieder ändern. Nutze PH_MEMBER_NAME und/oder PH_MEMBER_ID als Platzhalter`,
 			helpId: "HELP_SET"
 		});
 
@@ -535,6 +551,32 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				}
 			},
 			help: `!!clear`.padEnd(40, " ") + "| Wenn du möchtest das ich mal aufräume.... aber Vorsicht! Du kannst mich nicht aufhalten",
+			helpId: "HELP_CLEAR"
+		});
+
+		this.availableBotCommands.set("!!export", {
+			restricted: true,
+			devOnly: false,
+			method: (msg, options) => {
+				const Author = msg.author;
+				const TC: TextChannel = msg.channel as TextChannel;
+				const check = TC.permissionsFor(TC.guild.me).has("ATTACH_FILES");
+				if (check) {
+					let message = `Ok hier der angeforderte Datenexport für dich <@!${Author.id}>`;
+					let attachment: Attachment = null;
+					const file = resolve(rootDir, "infos", msg.guild.id + ".json");
+					try {
+						const rawFileContent = readFileSync(file);
+						attachment = new Attachment(rawFileContent, msg.guild.id + ".json");
+					} catch (error) {
+						message = `Huch, da lief was falsch, sorry! Bitte dem Entwickler melden: \n\`${error}\``;
+					}
+					TC.send(message, attachment);
+				} else {
+					TC.send(`Tut mir leid, aber ich habe nicht die nötigen Rechte um Dateien anzuhängen`);
+				}
+			},
+			help: `!!export`.padEnd(40, " ") + "| Ich werde dir alles was ich weiss per Datei senden!",
 			helpId: "HELP_CLEAR"
 		});
 
