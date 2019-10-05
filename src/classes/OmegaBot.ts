@@ -186,6 +186,13 @@ export class OmegaBot extends WorkerProcess {
 		}
 	}
 
+	protected guildMemberAddListener(M: GuildMember) {
+		const Guild: Guild = M.guild;
+		const { welcomeMessage } = this.guildConfigList.get(Guild.id);
+		const msg = welcomeMessage || "Herzlich willkommen <@!PH_MEMBER_ID>";
+		(Guild.systemChannel as TextChannel).send(msg.replace("PH_MEMBER_NAME", M.displayName).replace("PH_MEMBER_ID", M.id));
+	};
+
 	/**
 	 *
 	 *
@@ -199,11 +206,8 @@ export class OmegaBot extends WorkerProcess {
 		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
 		Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
 
-		G.client.on("guildMemberAdd", (M: GuildMember) => {
-			const { welcomeMessage } = this.guildConfigList.get(G.id);
-			const msg = welcomeMessage || "Herzlich willkommen <@!PH_MEMBER_ID>";
-			(G.systemChannel as TextChannel).send(msg.replace("PH_MEMBER_NAME", M.displayName).replace("PH_MEMBER_ID", M.id));
-		});
+		G.client.off("guildMemberAdd", this.guildMemberAddListener);
+		G.client.on("guildMemberAdd", this.guildMemberAddListener);
 
 		if (!this.streamerChecks.has(G.id)) {
 			this.streamerChecks.set(G.id, setTimeout(() => {

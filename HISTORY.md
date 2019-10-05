@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+- moved `guildMemberAdd` listener to method.
+- fetch guild from GuildMember in `guildMemberAdd` listener
+
 ## [0.7.0] - 2019-26-09
 ### Added
 - new commands
