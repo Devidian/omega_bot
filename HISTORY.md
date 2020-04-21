@@ -1,8 +1,25 @@
 ## [Unreleased]
 
+## [0.8.0] - 2019-21-04
 ### Fixed
 - moved `guildMemberAdd` listener to method.
 - fetch guild from GuildMember in `guildMemberAdd` listener
+### Changed
+- `?help` only shows commands that can be executed from the member issued the command
+- `streamerList` is now a more complex object instead of just an array with id's
+- `selfPromotionRoles` is now a more complex object instead of just an array with id's
+- `allowAll` is deprecated and moved to new property `flags.allowAll`
+- `streamerMessages` is now deprecated, moved to streamerList as object property
+- upgraded dependencies
+### Added
+- `flags` property for GuildConfiguration
+  - including new `sayHello` flag indicationg if bot welcomes new guild member
+  - including new `removeJoinCommand` flag indicating if the bot should remove issued `!join` commands (default: true)
+  - including new `removeLeaveCommand` flag indicating if the bot should remove issued `!leave` commands (default: true)
+- new `!set` subcommands for new flags
+- new `!set role @role|roleId` command to set selfPromotionRoles
+- new `!unset role @role|roleId` command to unset selfPromotionRoles
+- bot can now use Guild emoji reactions to join or leave roles
 
 ## [0.7.0] - 2019-26-09
 ### Added

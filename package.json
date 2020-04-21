@@ -1,22 +1,21 @@
 {
 	"name": "omega_discord_bot",
-	"version": "0.7.1-SNAPSHOT",
+	"version": "0.8.0-SNAPSHOT",
 	"scripts": {
 		"start": "node bin/main"
 	},
 	"private": true,
 	"dependencies": {
-		"@discordjs/uws": "^10.149.0",
+		"@discordjs/uws": "^11.149.1",
+		"axios": "^0.19.2",
 		"bufferutil": "^4.0.1",
-		"discord.js": "^11.5.1",
+		"discord.js": "^12.2.0",
 		"jdenticon": "^2.2.0",
-		"request": "^2.88.0",
-		"request-promise-native": "^1.0.7",
-		"rxjs": "^6.5.3",
-		"ws": "^7.1.2"
+		"rxjs": "^6.5.5",
+		"ws": "^7.2.3"
 	},
 	"devDependencies": {
 		"@types/node": "^12.7.7",
-		"@types/ws": "^6.0.3"
+		"@types/ws": "^7.2.4"
 	}
 }

@@ -1,12 +1,12 @@
 'use strict';
-import { Attachment, Client, Game, Guild, Message, Permissions, TextChannel, GuildMember } from "discord.js";
+import { Activity, Client, Guild, GuildMember, Message, MessageAttachment, Permissions, TextChannel } from "discord.js";
 import { accessSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { EOL } from "os";
 import { resolve } from "path";
 import { NodeConfig, processNodeId, rootDir } from "../config";
 import { Logger } from "../lib/tools/Logger";
 import { shuffle } from "../lib/tools/shuffle";
-import { GuildConfiguration } from "../models/GuildConfiguration";
+import { getDefaultGuildConfiguration, GuildConfiguration } from "../models/GuildConfiguration";
 import { WorkerProcess } from "./WorkerProcess";
 
 interface BotMethod {
@@ -52,7 +52,7 @@ export class OmegaBot extends WorkerProcess {
 	}
 
 	protected availableBotCommands: Map<string, BotCommand> = new Map<string, BotCommand>();
-	protected announcementCache: Map<string, Map<string, Game>> = new Map<string, Map<string, Game>>();
+	protected announcementCache: Map<string, Map<string, Activity>> = new Map<string, Map<string, Activity>>();
 	protected announcementDateCache: Map<string, Map<string, Date>> = new Map<string, Map<string, Date>>();
 	protected settingsLoaded: Map<string, boolean> = new Map<string, boolean>();
 
@@ -84,7 +84,7 @@ export class OmegaBot extends WorkerProcess {
 	 * @memberof OmegaBot
 	 */
 	protected run(): void {
-		const guilds = this.DiscordBot && this.DiscordBot.guilds ? this.DiscordBot.guilds.size : 0;
+		const guilds = this.DiscordBot && this.DiscordBot.guilds ? this.DiscordBot.guilds.cache.size : 0;
 		process.title = `OmegaBot: ${processNodeId} - ${guilds}`;
 		this.timer.refresh();
 	}
@@ -107,18 +107,7 @@ export class OmegaBot extends WorkerProcess {
 	 * @memberof OmegaBot
 	 */
 	protected saveGuildSettings(guildId: string, msg?: Message) {
-		const GuildConfig: GuildConfiguration = this.guildConfigList.get(guildId) || {
-			allowAll: false,
-			announcementDelayHours: 5,
-			announcerMessage: null,
-			welcomeMessage: null,
-			botname: "OmegaBot",
-			streamerChannelId: null,
-			streamerList: [],
-			streamerMessages: {},
-			selfPromotionRoles: [],
-			commandPermissions: {}
-		};
+		const GuildConfig: GuildConfiguration = this.guildConfigList.get(guildId) || getDefaultGuildConfiguration();
 
 		try {
 			const file = resolve(rootDir, "infos", guildId + ".json");
@@ -145,18 +134,7 @@ export class OmegaBot extends WorkerProcess {
 	 */
 	protected loadGuildSettings(guildId: string) {
 		if (this.settingsLoaded.has(guildId) && this.settingsLoaded.get(guildId)) return;
-		let GuildConfig: GuildConfiguration = {
-			allowAll: false,
-			announcementDelayHours: 5,
-			announcerMessage: null,
-			welcomeMessage: null,
-			botname: "OmegaBot",
-			streamerChannelId: null,
-			streamerList: [],
-			streamerMessages: {},
-			selfPromotionRoles: [],
-			commandPermissions: {}
-		};
+		let GuildConfig: GuildConfiguration = getDefaultGuildConfiguration();
 		const dataPath = resolve(rootDir, "infos", guildId);
 		try {
 			accessSync(dataPath);
@@ -171,7 +149,8 @@ export class OmegaBot extends WorkerProcess {
 			const file = resolve(rootDir, "infos", guildId + ".json");
 			try {
 				const dataRaw = readFileSync(file, { encoding: "utf-8" });
-				GuildConfig = Object.assign({}, GuildConfig, JSON.parse(dataRaw));
+				const importedData = JSON.parse(dataRaw);
+				GuildConfig = Object.assign({}, GuildConfig, this.patchGuildConfig(importedData));
 				Logger(110, "OmegaBot:loadGuildSettings", `Guild <${guildId}> settings found and loaded!`);
 			} catch (error) {
 				Logger(510, "OmegaBot:loadGuildSettings", `Guild <${guildId}> not found set all to default`);
@@ -186,10 +165,72 @@ export class OmegaBot extends WorkerProcess {
 		}
 	}
 
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {GuildConfiguration} old
+	 * @memberof OmegaBot
+	 */
+	protected patchGuildConfig(old: GuildConfiguration): GuildConfiguration {
+		// new flag property
+		if (old.allowAll) {
+			if (!old.flags) {
+				old.flags = {
+					allowAll: old.allowAll,
+					sayHello: false,
+					removeJoinCommand: true,
+					removeLeaveCommand: true
+				};
+			} else {
+				old.flags.allowAll = old.allowAll;
+			}
+			delete old.flags;
+		}
+		// new streamer list
+		if (Array.isArray(old.streamerList)) {
+			const newFormat = old.streamerList.map((v: string) => {
+				return {
+					id: v,
+					channelId: null,
+					message: old.streamerMessages && old.streamerMessages[v] ? old.streamerMessages[v] : null,
+				};
+			});
+			old.streamerList = {};
+			newFormat.forEach((v) => old.streamerList[v.id] = v);
+			delete old.streamerMessages;
+		}
+
+		// selfPromotionRoles
+		if (Array.isArray(old.selfPromotionRoles)) {
+			const newFormat = old.selfPromotionRoles.map((v: string) => {
+				return {
+					id: v,
+					channelId: null,
+					alias: null,
+					emojiName: null
+				};
+			});
+			old.selfPromotionRoles = {};
+			newFormat.forEach((v) => old.selfPromotionRoles[v.id] = v);
+		}
+
+		return old;
+	}
+
+	/**
+	 *
+	 *
+	 * @protected
+	 * @param {GuildMember} M
+	 * @returns
+	 * @memberof OmegaBot
+	 */
 	protected guildMemberAddListener(M: GuildMember) {
 		const Guild: Guild = M.guild;
-		const { welcomeMessage } = this.guildConfigList.get(Guild.id);
+		const { welcomeMessage, flags } = this.guildConfigList.get(Guild.id);
 		const msg = welcomeMessage || "Herzlich willkommen <@!PH_MEMBER_ID>";
+		if (!flags.sayHello) return;
 		(Guild.systemChannel as TextChannel).send(msg.replace("PH_MEMBER_NAME", M.displayName).replace("PH_MEMBER_ID", M.id));
 	};
 
@@ -205,6 +246,7 @@ export class OmegaBot extends WorkerProcess {
 		const { botname } = this.guildConfigList.get(G.id);
 		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
 		Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
+		this.initGuildCache(G);
 
 		G.client.off("guildMemberAdd", this.guildMemberAddListener);
 		G.client.on("guildMemberAdd", this.guildMemberAddListener);
@@ -213,14 +255,12 @@ export class OmegaBot extends WorkerProcess {
 			this.streamerChecks.set(G.id, setTimeout(() => {
 				const Guild: Guild = G;
 
-
-
 				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
 
-				if (!streamerChannelId) return;
+				// if (!streamerChannelId) return;
 
 				if (!this.announcementCache.has(G.id)) {
-					this.announcementCache.set(G.id, new Map<string, Game>());
+					this.announcementCache.set(G.id, new Map<string, Activity>());
 				}
 				if (!this.announcementDateCache.has(G.id)) {
 					this.announcementDateCache.set(G.id, new Map<string, Date>());
@@ -230,16 +270,18 @@ export class OmegaBot extends WorkerProcess {
 				const blockTime = new Date();
 				blockTime.setHours(blockTime.getHours() - (announcementDelayHours || 5));
 
-				Guild.members.forEach((Member, key) => {
-					const Game = Member.presence.game;
+				Guild.members.cache.forEach((Member, key) => {
+					const [Game] = Member.presence.activities.filter(activity => activity.type == "STREAMING" && activity.url);
 					const lastGame = aCache.get(Member.id);
 					const liveDate = aDateCache.get(Member.id);
-					if (Game && Game.streaming && (!lastGame || !lastGame.streaming) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList.includes(Member.id))) {
-						const txtCh: TextChannel = <TextChannel>Guild.channels.get(streamerChannelId);
+					if (Game && Game && (!lastGame || !lastGame) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList[Member.id])) {
+						const StreamerConfig = streamerList[Member.id];
+						const channelId = StreamerConfig.channelId || streamerChannelId;
+						const streamerMessage = StreamerConfig.message || announcerMessage || `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL`;
+						if (!channelId) return;
+						const txtCh: TextChannel = <TextChannel>Guild.channels.cache.get(channelId);
 						try {
-							let msg = (!announcerMessage ? `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL` : announcerMessage).replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
-							// !txtCh ? null : txtCh.send(`@everyone Aufgepasst ihr Seelen! \`${Member.displayName}\` streamt gerade! \n\`${Game.name}\` - \`${Game.details}\` \n Siehe hier:${Game.url}`);
-							// @everyone Aufgepasst ihr Seelen! `PH_USERNAME` streamt gerade!\n`PH_GAME_NAME` - `PH_GAME_DETAIL`\nSiehe hier: PH_GAME_URL
+							let msg = streamerMessage.replace("PH_USERNAME", Member.displayName).replace("PH_GAME_NAME", Game.name).replace("PH_GAME_DETAIL", Game.details).replace("PH_GAME_URL", Game.url);
 							!txtCh ? null : txtCh.send(msg);
 							aDateCache.set(Member.id, new Date());
 						} catch (error) {
@@ -268,18 +310,24 @@ export class OmegaBot extends WorkerProcess {
 				const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
-				const streamChannel = msg.guild.channels.get(GuildConfig.streamerChannelId);
+				const streamChannel = msg.guild.channels.cache.get(GuildConfig.streamerChannelId);
+				const streamerIdList = [];
+				for (const key in GuildConfig.streamerList) {
+					if (GuildConfig.streamerList.hasOwnProperty(key)) {
+						streamerIdList.push(key);
+					}
+				}
 				if (type.toLowerCase() == "streamer") {
 					const response = `Aktuell ist folgendes für Streamer eingestellt:
 \`\`\`ini
 Kanal    = ${GuildConfig.streamerChannelId} (${streamChannel ? streamChannel.name : "nicht gesetzt!"})
-Alle     = ${GuildConfig.allowAll ? "ja" : "nein"}
-Streamer = ${GuildConfig.streamerList.map(v => v + ` ( ${msg.guild.members.get(v).displayName} )`)}
+Alle     = ${GuildConfig.flags.allowAll ? "ja" : "nein"}
+Streamer = ${streamerIdList.map(v => v + ` ( ${msg.guild.members.cache.get(v).displayName} )`)}
 Delay    = ${GuildConfig.announcementDelayHours} Stunden
 Meldung  = ${GuildConfig.announcerMessage || "standard (nichts angegeben)"}
 \`\`\`
 `;
-					let attachment: Attachment = response.length > 1900 ? new Attachment(response, "info.md") : null;
+					let attachment: MessageAttachment = response.length > 1900 ? new MessageAttachment(response, "info.md") : null;
 					TC.send(response.length > 1900 ? "Meine Antwort wäre zu lang, daher hab ich dir eine info datei zusammengestellt." : response, attachment);
 				} else {
 					TC.send(`Hm was? versuch mal \`?help\``);
@@ -291,8 +339,16 @@ Meldung  = ${GuildConfig.announcerMessage || "standard (nichts angegeben)"}
 
 		this.availableBotCommands.set("?help", {
 			restricted: false,
-			method: (msg, [what, ...options]) => {
+			method: async (msg, [what, ...options]) => {
 				const TC: TextChannel = msg.channel as TextChannel;
+
+				const author = msg.author;
+				const member = msg.guild.member(author);
+				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
+				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+
 				if (what == "announcementMsg") {
 					TC.send(`Also wenn du \`!set announcementMsg [text]\` verwendest kannst du in [text] folgende Platzhalter verwenden:
 \`\`\`
@@ -305,7 +361,7 @@ PH_GAME_URL     | Dieser Platzhalter wird durch einen Link zum Stream ersetzt
 					const response = `Oh, du hast die Kommandos vergessen? Hier Bitte:
 \`\`\`
 Kommandos für Administratoren und berechtigte Personen:
-${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && v.restricted).map(v => v.help).join("\n")}
+${Array.from(this.availableBotCommands.entries()).filter(([k, v]) => !v.devOnly && v.restricted).filter(([k, v]) => isAdmin || isDeveloper || (GuildConfig.commandPermissions[k] && GuildConfig.commandPermissions[k].includes(author.id))).map(([k, v]) => v.help).join("\n")}
 -------------------------------
 Kommandos für alle anderen:
 ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.restricted).map(v => v.help).join("\n")}\n`
@@ -430,14 +486,55 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				msg.mentions.members.array().forEach((Member) => {
-					if (!GuildConfig.streamerList.includes(Member.id)) {
-						GuildConfig.streamerList.push(Member.id);
+					if (!GuildConfig.streamerList[Member.id]) {
+						GuildConfig.streamerList[Member.id] = {
+							id: Member.id,
+							channelId: null,
+							message: null
+						}
 					}
 				});
 				this.saveGuildSettings(guildId, msg);
 			},
 			help: `!addStreamer @name ...`.padEnd(40, " ") + "| Füge ein oder mehrere Streamer hinzu die ich ankündigen darf!",
 			helpId: "HELP_STREAMER_ADD"
+		});
+
+		this.availableBotCommands.set("!setStreamer", {
+			restricted: true,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const [prop, value, ...other] = options;
+				if (!["channelId", "message"].includes(prop)) {
+					TC.send(`Die Eigenschaft ${prop} kenne ich nicht!`);
+					return;
+				}
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				msg.mentions.members.array().forEach((Member) => {
+					if (!GuildConfig.streamerList[Member.id]) {
+						GuildConfig.streamerList[Member.id] = {
+							id: Member.id,
+							channelId: prop == "channelId" ? value : null,
+							message: prop == "message" ? value : null
+						}
+					} else if (prop == "channelId") {
+						if (value == "null") {
+							GuildConfig.streamerList[Member.id].channelId = null;
+						} else if (msg.guild.channels.cache.has(value)) {
+							GuildConfig.streamerList[Member.id].channelId = value;
+						} else {
+							TC.send(`Die KanalID ${value} kenne ich nicht!`);
+						}
+					} else if (prop == "message") {
+						GuildConfig.streamerList[Member.id].message = value == "null" ? null : value;
+					}
+				});
+				this.saveGuildSettings(guildId, msg);
+			},
+			help: `!setStreamer [PROP] [VALUE] @name ...`.padEnd(40, " ") + "| Ändere die Konfiguration eines Streamers, prop kann 'channelId' oder 'message' sein",
+			helpId: "HELP_STREAMER_SET"
 		});
 
 		this.availableBotCommands.set("!removeStreamer", {
@@ -448,8 +545,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				msg.mentions.members.array().forEach((Member) => {
-					if (GuildConfig.streamerList.includes(Member.id)) {
-						GuildConfig.streamerList.splice(GuildConfig.streamerList.indexOf(Member.id), 1);
+					if (GuildConfig.streamerList[Member.id]) {
+						delete GuildConfig.streamerList[Member.id];
 					}
 				});
 				this.saveGuildSettings(guildId, msg);
@@ -480,11 +577,42 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				const to = options[0] == "true";
-				GuildConfig.allowAll = to;
+				GuildConfig.flags.allowAll = to;
 				this.saveGuildSettings(guildId, msg);
 			},
 			help: `!setAllowAll [true|false]`.padEnd(40, " ") + "| Erlaube das ich jeden Streamer angekündigt darf [true] oder nicht [false]",
 			helpId: "HELP_SET_ALLOW_ALL"
+		});
+
+		this.availableBotCommands.set("!unset", {
+			restricted: true,
+			devOnly: false,
+			method: (msg, options) => {
+				const TC: TextChannel = msg.channel as TextChannel;
+				const guildId: string = msg.guild.id;
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const me = msg.guild.me;
+				const [prop, ...args] = options;
+				switch (prop) {
+					case "role": {
+						const [roleId] = args;
+						const [Role, ...other] = msg.mentions.roles.array();
+						const useRoleId = Role?.id || roleId;
+						if (GuildConfig.selfPromotionRoles[useRoleId]) {
+							delete GuildConfig.selfPromotionRoles[useRoleId];
+						} else {
+						}
+						this.saveGuildSettings(guildId, msg);
+
+					} break;
+					default:
+						msg.react("👎");
+						break;
+				}
+
+			},
+			help: `!unset role @role`.padEnd(40, " ") + "| Entziehe mir das Recht diese Rolle zu vergeben",
+			helpId: "HELP_UNSET"
 		});
 
 		this.availableBotCommands.set("!set", {
@@ -498,7 +626,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const [prop, ...args] = options;
 				switch (prop) {
 					case "allowAll": {
-						GuildConfig.allowAll = args[0] == "true";
+						GuildConfig.flags.allowAll = [true, "true", 1, "1"].includes(args[0]);
 						this.saveGuildSettings(guildId, msg);
 					} break;
 					case "name": {
@@ -528,6 +656,62 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 						GuildConfig.welcomeMessage = args.join(" ");
 						this.saveGuildSettings(guildId, msg);
 					} break;
+					case "sayHello": {
+						GuildConfig.flags.sayHello = [true, "true", 1, "1"].includes(args[0]);
+						this.saveGuildSettings(guildId, msg);
+					} break;
+					case "removeJoinCommand": {
+						GuildConfig.flags.removeJoinCommand = [true, "true", 1, "1"].includes(args[0]);
+						this.saveGuildSettings(guildId, msg);
+					} break;
+					case "removeLeaveCommand": {
+						GuildConfig.flags.removeLeaveCommand = [true, "true", 1, "1"].includes(args[0]);
+						this.saveGuildSettings(guildId, msg);
+					} break;
+					case "streamer": {
+						const [streamerId, property, ...value] = args;
+						const registredStreamerIds = Object.keys(GuildConfig.streamerList);
+						if (registredStreamerIds.includes(streamerId)) {
+							switch (property) {
+								case "channelId": {
+									GuildConfig.streamerList[streamerId].channelId = value.join();
+									this.saveGuildSettings(guildId, msg);
+								} break;
+								case "message": {
+									GuildConfig.streamerList[streamerId].message = value.join(" ");
+									this.saveGuildSettings(guildId, msg);
+								} break;
+								default:
+									// TODO unknown property, what is your problem?
+									break;
+							}
+						} else {
+							// TODO message please use addStreamer first
+						}
+					} break;
+					case "role": {
+						const [roleId, channelId, alias, emoji] = args;
+						const [Role, ...other] = msg.mentions.roles.array();
+						if (other && other.length) {
+							// TODO Sorry only 1 role per command!
+						} else {
+							const useRoleId = Role?.id || roleId;
+							if (GuildConfig.selfPromotionRoles[useRoleId]) {
+
+								if (channelId) GuildConfig.selfPromotionRoles[useRoleId].channelId.push(channelId);
+								if (alias) GuildConfig.selfPromotionRoles[useRoleId].alias = alias;
+								if (emoji) GuildConfig.selfPromotionRoles[useRoleId].emojiName = emoji;
+							} else {
+								GuildConfig.selfPromotionRoles[useRoleId] = {
+									id: useRoleId,
+									alias: alias ? alias : null,
+									channelId: channelId ? [channelId] : [],
+									emojiName: emoji
+								}
+							}
+							this.saveGuildSettings(guildId, msg);
+						}
+					} break;
 					default:
 						msg.react("👎");
 						break;
@@ -538,6 +722,11 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				+ `!set streamerChannel`.padEnd(40, " ") + `| Der aktuelle Kanal wird zum Streamer Kanal, hier landen alle Ankündigungen\n`
 				+ `!set announcementDelayHours [number]`.padEnd(40, " ") + `| Damit stellst du ein wie lange ich still bleiben soll nachdem ich einen Streamer angekündigt habe!\n`
 				+ `!set announcementMsg [text]`.padEnd(40, " ") + `| Oh das ist komplex versuch mal ?help announcementMsg\n`
+				+ `!set sayHello [true|false]`.padEnd(40, " ") + `| Soll ich neue Mitglieder persönlich begrüßen oder nicht?\n`
+				+ `!set removeJoinCommand [true|false]`.padEnd(40, " ") + `| Soll ich eingegebene !join Befehle löschen oder nicht?\n`
+				+ `!set removeLeaveCommand [true|false]`.padEnd(40, " ") + `| Soll ich eingegebene !leave Befehle löschen oder nicht?\n`
+				+ `!set role @role channelId? alias? emoji?`.padEnd(40, " ") + `| Konfiguriere eine Rolle die ich vergeben darf\n`
+				+ `!set streamer memberId property value`.padEnd(40, " ") + `| Konfiguriere einen Streamer, property kann 'message' oder 'channelId' sein\n`
 				+ `!set welcomeMsg [text]`.padEnd(40, " ") + `| Damit kannst du den Willkommenstext für neue Mitglieder ändern. Nutze PH_MEMBER_NAME und/oder PH_MEMBER_ID als Platzhalter`,
 			helpId: "HELP_SET"
 		});
@@ -567,11 +756,11 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const check = TC.permissionsFor(TC.guild.me).has("ATTACH_FILES");
 				if (check) {
 					let message = `Ok hier der angeforderte Datenexport für dich <@!${Author.id}>`;
-					let attachment: Attachment = null;
+					let attachment: MessageAttachment = null;
 					const file = resolve(rootDir, "infos", msg.guild.id + ".json");
 					try {
 						const rawFileContent = readFileSync(file);
-						attachment = new Attachment(rawFileContent, msg.guild.id + ".json");
+						attachment = new MessageAttachment(rawFileContent, msg.guild.id + ".json");
 					} catch (error) {
 						message = `Huch, da lief was falsch, sorry! Bitte dem Entwickler melden: \n\`${error}\``;
 					}
@@ -607,8 +796,10 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const GuildConfig = this.guildConfigList.get(guildId);
 				// const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
 				const Author = msg.author;
-				const roleNames: string[] = msg.guild.roles.filter((R) => GuildConfig.selfPromotionRoles.includes(R.id)).map((R) => "`" + R.name + "`");
-				roleNames.length < 1 ? null : TC.send(`Hey <@!${Author.id}>! Folgende Rollen kann ich vergeben/nehmen: ${roleNames.join(', ')}`);
+				// const roleNames: string[] = [];
+				const roleNames = Object.keys(GuildConfig.selfPromotionRoles).map(roleId => msg.guild.channels.resolve(roleId)).map((R) => "`" + R.name + "`");
+				// const roleNames = msg.guild.roles.cache.filter((R) => !!GuildConfig.selfPromotionRoles[R.id]).map((R) => "`" + R.name + "`");
+				roleNames.length < 1 ? TC.send(`Hey <@!${Author.id}>! Tut mir leid aber ich darf keine Rollen vergeben :'(`) : TC.send(`Hey <@!${Author.id}>! Folgende Rollen kann ich vergeben/nehmen: ${roleNames.join(', ')}`);
 				// roleNamesWarn.length<1?null: TC.send(`ACHTUNG! Folgende Rollen sind über meinem Niveau: ${roleNamesWarn.join(', ')}`);
 			},
 			help: `?roles`.padEnd(40, " ") + "| Ich zeige dir welche Rollen ich verwalten darf, benutze `!join @role` um einer Rolle beizutreten.",
@@ -622,7 +813,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
-				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const BotRolePosition = TC.guild.me.roles.highest.position;
 				const roleNames: string[] = [];
 				// const roleNamesWarn: string[] = [];
 				const Author = msg.author;
@@ -631,13 +822,18 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 						TC.send(`ACHTUNG! Die Rolle \`${Role.name}\` wird von einem anderen Service verwaltet, die kann ich nicht vergeben`);
 						return;
 					}
-					if (Role.calculatedPosition >= BotRolePosition) {
+					if (Role.position >= BotRolePosition) {
 						// roleNamesWarn.push(Role.name);
 						TC.send(`UPS! Die Rolle \`${Role.name}\` ist über meinem Niveau, ich kann Sie nicht vergeben, sorry!`);
 						return;
 					}
-					if (!GuildConfig.selfPromotionRoles.includes(Role.id)) {
-						GuildConfig.selfPromotionRoles.push(Role.id);
+					if (!GuildConfig.selfPromotionRoles[Role.id]) {
+						GuildConfig.selfPromotionRoles[Role.id] = {
+							id: Role.id,
+							alias: null,
+							channelId: null,
+							emojiName: null
+						};
 						roleNames.push(Role.name);
 
 					}
@@ -662,8 +858,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				// const roleNamesWarn: string[] = [];
 				const Author = msg.author;
 				msg.mentions.roles.array().forEach((Role) => {
-					if (GuildConfig.selfPromotionRoles.includes(Role.id)) {
-						GuildConfig.selfPromotionRoles.splice(GuildConfig.selfPromotionRoles.indexOf(Role.id), 1);
+					if (GuildConfig.selfPromotionRoles[Role.id]) {
+						delete GuildConfig.selfPromotionRoles[Role.id];
 						roleNames.push(Role.name);
 
 						// if(Role.calculatedPosition>=BotRolePosition) {
@@ -690,7 +886,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				const Author = msg.author;
-				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const BotRolePosition = TC.guild.me.roles.highest.position;
 
 				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
 				if (!check) {
@@ -698,9 +894,14 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 					return;
 				}
 
+
 				const Role = msg.mentions.roles.array()[0];
-				if (GuildConfig.selfPromotionRoles.includes(Role.id) && Role.position < BotRolePosition) {
-					msg.guild.member(Author).addRole(Role);
+				const selfPromotionConfig = GuildConfig.selfPromotionRoles[Role.id];
+				if (selfPromotionConfig.channelId.length > 0 && !selfPromotionConfig.channelId.includes(TC.id)) {
+					return; // not allowed in this channel
+				}
+				if (selfPromotionConfig && Role.position < BotRolePosition) {
+					msg.guild.member(Author).roles.add(Role);
 					TC.send(`Alles klar <@!${Author.id}>, du bist jetzt in \`${Role.name}\`, herzlichen Glückwunsch!`);
 				} else {
 					TC.send(`Tut mir leid <@!${Author.id}>, die Rolle \`${Role.name}\` darf ich nicht verwalten.`);
@@ -718,7 +919,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
 				const Author = msg.author;
-				const BotRolePosition = TC.guild.me.highestRole.calculatedPosition;
+				const BotRolePosition = TC.guild.me.roles.highest.position;
 
 				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
 				if (!check) {
@@ -727,8 +928,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				}
 
 				const Role = msg.mentions.roles.array()[0];
-				if (GuildConfig.selfPromotionRoles.includes(Role.id) && Role.position < BotRolePosition) {
-					msg.guild.member(Author).removeRole(Role);
+				if (GuildConfig.selfPromotionRoles[Role.id] && Role.position < BotRolePosition) {
+					msg.guild.member(Author).roles.remove(Role);
 					TC.send(`Alles klar <@!${Author.id}>, du bist jetzt nicht mehr in \`${Role.name}\``);
 				} else {
 					TC.send(`Tut mir leid <@!${Author.id}>, die Rolle \`${Role.name}\` darf ich nicht verwalten.`);
@@ -747,7 +948,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 	 * @memberof OmegaBot
 	 */
 	protected setupDiscordBot(): void {
-		if (!OmegaBot.NodeConfig.enabled) {
+		if (!OmegaBot?.NodeConfig?.enabled) {
 			Logger(511, "OmegaBot:setupDiscordBot", `Discord not enabled.`);
 			return;
 		} else {
@@ -755,7 +956,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 			this.DiscordBot.on('ready', () => {
 				Logger(111, "OmegaBot:setupDiscordBot", `Logged in as ${this.DiscordBot.user.tag}!`);
 
-				this.DiscordBot.guilds.forEach((G, key) => {
+				this.DiscordBot.guilds.cache.forEach((G, key) => {
 					this.initGuild(G);
 				});
 			});
@@ -764,13 +965,66 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				this.initGuild(guild);
 				try {
 					Logger(110, "DiscordBot.on->guildCreate", `Just joined new Guild ${guild.name} with ${guild.memberCount} members`);
-					const publicCH = guild.channels.filter((GC) => GC.type == "text" && GC.permissionsFor(guild.me).has("SEND_MESSAGES"));
-					(<TextChannel>guild.systemChannel || <TextChannel>publicCH.random()).send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
+					const publicCH = guild.channels.cache.find((GC) => GC.type == "text" && GC.permissionsFor(guild.me).has("SEND_MESSAGES"));
+					(<TextChannel>guild.systemChannel || <TextChannel>publicCH).send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
 				} catch (error) {
 					Logger(911, "DiscordBot.on->guildCreate", error);
 				}
 			});
 
+			this.DiscordBot.on('messageReactionAdd', async (messageReaction, user) => {
+				if (user.bot || messageReaction.message.channel.type !== "text") {
+					return; // dont handle bot reactions
+				}
+				const { emoji, message } = messageReaction;
+				const guildId = message.guild.id;
+				const TC = message.channel as TextChannel;
+				const { selfPromotionRoles } = this.guildConfigList.get(guildId);
+				const [role] = Object.keys(selfPromotionRoles).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
+				Logger(0, "DiscordBot.on->messageReactionAdd", `${user.username} reacted with <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
+				if (role) {
+					const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+					if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
+						return; // not allowed in this channel
+					}
+					const Role = await message.guild.roles.fetch(role.id);
+					if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
+						message.guild.member(user.id).roles.add(Role);
+					} else {
+						Logger(0, "DiscordBot.on->messageReactionAdd", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
+					}
+				}
+
+			});
+
+			this.DiscordBot.on('messageReactionRemove', async (messageReaction, user) => {
+				if (user.bot || messageReaction.message.channel.type !== "text") {
+					return; // dont handle bot reactions
+				}
+				const { emoji, message } = messageReaction;
+				const guildId = message.guild.id;
+				const TC = message.channel as TextChannel;
+				const { selfPromotionRoles } = this.guildConfigList.get(guildId);
+				const [role] = Object.keys(selfPromotionRoles).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
+				Logger(0, "DiscordBot.on->messageReactionRemove", `${user.username} removed reaction <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
+				if (role) {
+					const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+					if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
+						return; // not allowed in this channel
+					}
+					const Role = await message.guild.roles.fetch(role.id);
+					if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
+						message.guild.member(user.id).roles.remove(Role);
+					} else {
+						Logger(0, "DiscordBot.on->messageReactionRemove", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
+					}
+				}
+
+			});
+
+			this.DiscordBot.on('messageReactionRemoveAll', (message) => {
+				// Logger(0, "DiscordBot.on->messageReactionRemoveAll", message);
+			});
 
 			this.DiscordBot.on('message', async msg => {
 				if (!msg.guild) return;
@@ -778,15 +1032,34 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				if (msg.author.bot) {
 					return;
 				}
+				const guildId: string = msg.guild.id;
+				const me = msg.guild.me;
+				const TC: TextChannel = msg.channel as TextChannel;
+				const author = msg.author;
+				const member = await msg.guild.member(author);
+				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
+				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
+				const isCommand = msg.content.startsWith('?') || msg.content.startsWith('!');
+				const GuildConfig = this.guildConfigList.get(guildId);
+				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage, commandPermissions, streamerMessages, selfPromotionRoles } = GuildConfig;
+				const [isAliasFor] = Object.keys(selfPromotionRoles).filter(role => msg.content === selfPromotionRoles[role].alias);
+
 				// ignore all other messages
-				if (!msg.content.startsWith('?') && !msg.content.startsWith('!')) {
+				if (!isCommand) {
+					if (isAliasFor) {
+						const role = selfPromotionRoles[isAliasFor];
+						Logger(0, "DiscordBot.on->message", `Member used alias <${role.alias}> for ${role.id}`);
+						const guildRole = await msg.guild.roles.fetch(role.id);
+						const isCorrectChannel = role.channelId.includes(TC.id);
+
+						if (isCorrectChannel) member.roles.add(guildRole);
+					} else {
+						Logger(0, "DiscordBot.on->message", `Unhandled message <${msg.content}> from ${author.username}`);
+					}
 					return;
 				}
 
 				const [command, ...options] = msg.content.split(" ");
-				const guildId: string = msg.guild.id;
-				const me = msg.guild.me;
-				const TC: TextChannel = msg.channel as TextChannel;
 				if (!this.availableBotCommands.has(command)) {
 					if (!msg.content.startsWith('?')) {
 						msg.react("👎");
@@ -809,14 +1082,8 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 					}
 					return;
 				}
-				const boco = this.availableBotCommands.get(command);
 
-				const author = msg.author;
-				const member = await msg.guild.fetchMember(author);
-				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
-				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
-				const GuildConfig = this.guildConfigList.get(guildId);
-				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage, commandPermissions, streamerMessages } = GuildConfig;
+				const boco = this.availableBotCommands.get(command);
 
 				if (boco.devOnly && !isDeveloper) {
 					msg.react("👎");
@@ -842,6 +1109,31 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 	}
 
 	/**
+	 * fetch last 100 messages from every channel to support reactions to those messages in case of bot restart
+	 *
+	 * @protected
+	 * @param {Guild} guild
+	 * @memberof OmegaBot
+	 */
+	protected initGuildCache(guild: Guild) {
+
+		guild.channels.cache.forEach(async channel => {
+			if (channel.type == "text") {
+				const TC: TextChannel = channel as TextChannel;
+				try {
+					const messages = await TC.messages.fetch({ limit: 100 }, true);
+					Logger(0, "OmegaBot:initGuildCache", `loaded ${messages.size} messages from ${TC.name}`);
+				} catch (error) {
+					// no access == 50001
+					if (error.code !== 50001) {
+						Logger(911, "OmegaBot:initGuildCache", error);
+					}
+				}
+			}
+		})
+	}
+
+	/**
 	 *
 	 *
 	 * @protected
@@ -855,7 +1147,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 		const startMsg = TC.lastMessage;
 		const Author = m.author;
 
-		TC.fetchMessages({ before: startId, limit: 100 }).then(async (msgList) => {
+		TC.messages.fetch({ before: startId, limit: 100 }).then(async (msgList) => {
 			Logger(11, "OmegaBot.clearTextChannel", `Found ${msgList.size} messages in ${TC.guild.name}/${TC.name} to delete`);
 			const idList = msgList.keyArray();
 			const deleteQueue = [];
