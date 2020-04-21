@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.8.2] - 2019-21-04
+### Removed
+- obsolete packages removed
+
 ## [0.8.1] - 2019-21-04
 ### Fixed
 - `?roles` command
