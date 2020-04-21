@@ -800,7 +800,6 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const roleIds = Object.keys(GuildConfig.selfPromotionRoles)
 				const roles = roleIds.map(roleId => msg.guild.roles.resolve(roleId))
 				const roleNames = roles.map((R) => "`" + R?.name + "`");
-				console.log(roleIds,roles,roleNames);
 				// const roleNames = msg.guild.roles.cache.filter((R) => !!GuildConfig.selfPromotionRoles[R.id]).map((R) => "`" + R.name + "`");
 				roleNames.length < 1 ? TC.send(`Hey <@!${Author.id}>! Tut mir leid aber ich darf keine Rollen vergeben :'(`) : TC.send(`Hey <@!${Author.id}>! Folgende Rollen kann ich vergeben/nehmen: ${roleNames.join(', ')}`);
 				// roleNamesWarn.length<1?null: TC.send(`ACHTUNG! Folgende Rollen sind über meinem Niveau: ${roleNamesWarn.join(', ')}`);
