@@ -1,6 +1,6 @@
 {
 	"name": "omega_discord_bot",
-	"version": "0.8.0-SNAPSHOT",
+	"version": "0.8.1",
 	"scripts": {
 		"start": "node bin/main"
 	},

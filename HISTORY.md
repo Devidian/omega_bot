@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.8.1] - 2019-21-04
+### Fixed
+- `?roles` command
+
 ## [0.8.0] - 2019-21-04
 ### Fixed
 - moved `guildMemberAdd` listener to method.
