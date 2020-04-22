@@ -276,8 +276,8 @@ export class OmegaBot extends WorkerProcess {
 					const liveDate = aDateCache.get(Member.id);
 					if (Game && Game && (!lastGame || !lastGame) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList[Member.id])) {
 						const StreamerConfig = streamerList[Member.id];
-						const channelId = StreamerConfig.channelId || streamerChannelId;
-						const streamerMessage = StreamerConfig.message || announcerMessage || `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL`;
+						const channelId = StreamerConfig?.channelId || streamerChannelId;
+						const streamerMessage = StreamerConfig?.message || announcerMessage || `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL`;
 						if (!channelId) return;
 						const txtCh: TextChannel = <TextChannel>Guild.channels.cache.get(channelId);
 						try {
