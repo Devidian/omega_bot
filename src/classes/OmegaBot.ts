@@ -1103,10 +1103,26 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				return;
 
 			});
+
 			this.DiscordBot.on("error", (e: Error) => {
-				Logger(911, "OmegaBot:setupDiscordBot", e);
+				Logger(911, "OmegaBot:setupDiscordBot@error", e);
 			});
-			this.DiscordBot.login(OmegaBot.NodeConfig.token);
+
+			this.DiscordBot.on("warn", (w) => {
+				Logger(511, "OmegaBot:setupDiscordBot@warn", w);
+			});
+
+			this.DiscordBot.on("debug", (d) => {
+				Logger(-1, "OmegaBot:setupDiscordBot@debug", d);
+			});
+
+			this.DiscordBot.on("rateLimit", (limit) => {
+				Logger(1, "OmegaBot:setupDiscordBot@rateLimit", limit);
+			});
+
+			this.DiscordBot.login(OmegaBot.NodeConfig.token).catch(e => {
+				Logger(911, "OmegaBot:setupDiscordBot->login", e);
+			});
 		}
 	}
 
