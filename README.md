@@ -1,19 +1,12 @@
-# About OmegaBot
+# About Omega Bot (Discord Bot)
 
-OmegaBot prints out some user information that can be saved in the `./infos/` directory in json format.
-Currently the format looks like this:
-
-```json
-{
-    "data": "TEXT TO REPLY"
-}
-```
+The `OmegaBot` Discord bot was started as simple request-response bot where you can add commands that response with information. It was then expanded to have some Streaming-detection stuff to announce when people are streaming (using discord user status) and recently got some more role-management features. Several more features are planned in the future. See HISTORY.md for latest changes
 
 ## Install
 ```bash
 mkdir -p /srv/apps;
 cd /srv/apps;
-git clone git@github.com:Devidian/flamongo_discord_bot.git --branch OmegaBot OmegaBot;
+git clone git@github.com:Devidian/omega_bot.git;
 ```
 
 ## Invitation Link
@@ -61,8 +54,9 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 |!join @role||everyone|
 |!leave @role||everyone|
 
-## .env
+# .env contents
 
+```ini
 APP_TITLE=OmegaBot
 APP_CLI_PORT=47110
 APP_WSS_PORT=47015
@@ -84,3 +78,4 @@ MONGODB_APPNAME=OMEGA-BOT
 MONGODB_USER=mongouser
 MONGODB_PASSWORD=mongopass
 #
+```
