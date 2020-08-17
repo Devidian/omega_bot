@@ -1,20 +1,15 @@
-import { cfg, appArguments } from './config';
-import * as WebSocket from "ws";
-import { Logger } from './lib/tools/Logger';
+import { ClientOptions } from "ws";
+const WebSocket = require('ws');
+import { Logger, Loglevel } from './util';
 
-const [command] = appArguments
+const [cwd, app, command] = process.argv;
 
-if (cfg.cli.commands.indexOf(command) < 0) {
-	Logger(511, "app-cli", 'illegal command, use one of these:', cfg.cli.commands);
-	process.exit();
-}
+Logger(Loglevel.INFO, "app-cli", 'Starting IO Client for sending command <%s> to Master', command);
 
-Logger(111, "app-cli", 'Starting IO Client for sending command <%s> to Master', command);
-
-var IOClient: WebSocket = new WebSocket(`ws://localhost:${cfg.cli.port}/`);
+var IOClient = new WebSocket(`ws://localhost:${Number(process.env.APP_CLI_PORT)}/`);
 
 IOClient.on('disconnect', function () {
-	Logger(111, "app-cli", 'Disconnected, bye!');
+	Logger(Loglevel.INFO, "app-cli", 'Disconnected, bye!');
 	IOClient.removeAllListeners();
 	process.exit(0);
 });
@@ -25,7 +20,7 @@ interface CLIMessage {
 }
 
 IOClient.on('connect', function () {
-	Logger(111, "app-cli", 'Successful connected to Master');
+	Logger(Loglevel.INFO, "app-cli", 'Successful connected to Master');
 	IOClient.send(command);
 	IOClient.on('message', function (msg: CLIMessage) {
 		Logger(11, "app-cli", `Master: ${msg}`);
@@ -34,10 +29,12 @@ IOClient.on('connect', function () {
 
 				break;
 			case 'done':
-				Logger(111, "app-cli", 'Done! Closeing connection to Master.');
+				Logger(Loglevel.INFO, "app-cli", 'Done! Closeing connection to Master.');
 				IOClient.close();
 				break;
 			default:
+				Logger(Loglevel.WARNING, "app-cli", `Unknown response ${msg.event}`);
+				IOClient.close();
 				break;
 		}
 		IOClient.close();

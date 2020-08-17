@@ -60,3 +60,27 @@ https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&p
 |?roles||everyone|
 |!join @role||everyone|
 |!leave @role||everyone|
+
+## .env
+
+APP_TITLE=OmegaBot
+APP_CLI_PORT=47110
+APP_WSS_PORT=47015
+APP_TICK=250
+APP_LOGLEVEL=0
+APP_LOGCOLOR=true
+#
+SERVICE_USER=nodejs
+SERVICE_ID=OBOT
+SERVICE_NAME=omega-bot
+SERVICE_DESC=OmegaBot-Discord-Bot-Unit
+SERVICE_ENV=[]
+SERVICE_AFTER=["network.target"]
+#
+MONGODB_URI=mongodb://mongouser:mongopass@mongohost/omegabot?authSource=admin&retryWrites=true&w=majority
+MONGODB_DB=omegabot
+MONGODB_APPNAME=OMEGA-BOT
+# used for composer mongodb root setup
+MONGODB_USER=mongouser
+MONGODB_PASSWORD=mongopass
+#

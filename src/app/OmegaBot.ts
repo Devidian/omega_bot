@@ -1,54 +1,33 @@
 'use strict';
+import { Logger, Loglevel, shuffle } from "@/util";
+import { plainToClass, plainToClassFromExist } from "class-transformer";
 import { Activity, Client, Guild, GuildMember, Message, MessageAttachment, Permissions, TextChannel } from "discord.js";
-import { accessSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { EOL } from "os";
-import { resolve } from "path";
-import { NodeConfig, processNodeId, rootDir } from "../config";
-import { Logger } from "../lib/tools/Logger";
-import { shuffle } from "../lib/tools/shuffle";
-import { getDefaultGuildConfiguration, GuildConfiguration } from "../models/GuildConfiguration";
-import { WorkerProcess } from "./WorkerProcess";
-
-interface BotMethod {
-	(msg: Message, args?: string[]): void
-}
-
-interface BotCommand {
-	restricted?: boolean,	// restricted or free for all
-	devOnly?: boolean,		// execute only from developer
-	method: BotMethod,
-	helpId: string,			// help index
-	help: string			// help default text
-};
-
+import { isArray } from "util";
+import { WorkerProcess } from "../util/WorkerProcess";
+import { BotCommand } from "./interfaces/BotCommand";
+import { botNodeCollection, BotNodeConfig } from "./models/bot-node-config";
+import { CustomInfo, customInfoCollection } from "./models/custom-info";
+import { guildConfigurationCollection } from "./models/guild-configuration";
+import { GuildConfiguration } from "./models/guild-configuration/guild-configuration";
+import { ObjectId } from "mongodb";
+import { resolve, basename } from "path";
+import { existsSync, readFileSync, readdirSync } from "fs";
 
 export class OmegaBot extends WorkerProcess {
-	private static _NodeConfig: NodeConfig = null;
-	protected static highlander: OmegaBot = null;
-
-	public static get NodeConfig(): NodeConfig {
-		return OmegaBot._NodeConfig;
-	};
-
-	public static getInstance(nc?: NodeConfig): OmegaBot {
-		OmegaBot._NodeConfig = nc ? nc : OmegaBot.NodeConfig;
-		if (!OmegaBot.highlander) {
-			OmegaBot.highlander = new OmegaBot();
-		}
-		return OmegaBot.highlander;
-	}
-
 	// Object stuff
 	protected DiscordBot: Client = null;
 	protected timer: NodeJS.Timer = null;
 	protected streamerChecks: Map<string, NodeJS.Timer> = new Map<string, NodeJS.Timer>();
 	protected guildConfigList: Map<string, GuildConfiguration> = new Map<string, GuildConfiguration>();
+	botConfig: BotNodeConfig;
 
-	private get me(): string {
-		return __filename.split("/").pop();
-	}
 	public get title(): string {
 		return "OmegaBot";
+	}
+
+	public get className(): string {
+		return this.constructor.name;
 	}
 
 	protected availableBotCommands: Map<string, BotCommand> = new Map<string, BotCommand>();
@@ -60,21 +39,11 @@ export class OmegaBot extends WorkerProcess {
 	 *Creates an instance of OmegaBot.
 	 * @memberof OmegaBot
 	 */
-	constructor() {
+	constructor(private botNodeId: ObjectId | string) {
 		super();
 		this.setupDiscordBot();
 		this.setupBotCommands();
-		this.timer = setTimeout(_ => { this.run(); }, OmegaBot.NodeConfig.tick);
-	}
-
-	/**
-	 *
-	 *
-	 * @param {NodeConfig} nc
-	 * @memberof OmegaBot
-	 */
-	public updateConfig(nc: NodeConfig): void {
-		Object.assign(OmegaBot._NodeConfig, nc);
+		this.timer = setTimeout(_ => { this.run(); }, Number(process.env.APP_TICK || 250));
 	}
 
 	/**
@@ -85,7 +54,7 @@ export class OmegaBot extends WorkerProcess {
 	 */
 	protected run(): void {
 		const guilds = this.DiscordBot && this.DiscordBot.guilds ? this.DiscordBot.guilds.cache.size : 0;
-		process.title = `OmegaBot: ${processNodeId} - ${guilds}`;
+		process.title = `OmegaBot: ${this.botNodeId} - ${guilds}`;
 		this.timer.refresh();
 	}
 
@@ -106,22 +75,75 @@ export class OmegaBot extends WorkerProcess {
 	 * @param {string} guildId
 	 * @memberof OmegaBot
 	 */
-	protected saveGuildSettings(guildId: string, msg?: Message) {
-		const GuildConfig: GuildConfiguration = this.guildConfigList.get(guildId) || getDefaultGuildConfiguration();
+	protected async saveGuildSettings(guildId: string, msg?: Message) {
+		const GuildConfig: GuildConfiguration = this.guildConfigList.get(guildId) || new GuildConfiguration().default;
 
 		try {
-			const file = resolve(rootDir, "infos", guildId + ".json");
-			try {
-				writeFileSync(file, JSON.stringify(GuildConfig, null, 2));
-				!msg ? null : msg.react("👍");
-			} catch (error) {
-				Logger(911, "OmegaBot:saveGuildSettings", error);
-				!msg ? null : msg.react("👎");
+			await guildConfigurationCollection.save(GuildConfig);
+			!msg ? null : msg.react("👍");
+		} catch (error) {
+			Logger(Loglevel.ERROR, "OmegaBot:saveGuildSettings", error);
+			!msg ? null : msg.react("👎");
+		}
+	}
+
+	/**
+	 * import old config json files
+	 *
+	 * @protected
+	 * @param {string} guildId
+	 * @returns
+	 * @memberof OmegaBot
+	 */
+	protected importGuildSettings(guildId: string) {
+		let guildConfig: GuildConfiguration;
+		guildConfig = new GuildConfiguration().default;
+		guildConfig.guildId = guildId;
+
+		try {
+			const file = resolve(process.cwd(), "infos", guildId + ".json");
+			if (existsSync(file)) {
+				const importRawContent = readFileSync(file).toString('utf-8');
+				const plain = JSON.parse(importRawContent);
+				plainToClassFromExist(guildConfig, plain);
+				Logger(Loglevel.INFO, "OmegaBot:importGuildSettings", `Guild <${guildId}> config file found and imported`);
+				this.importInfoItemsFromGuild(guildId);
+			} else {
+				Logger(Loglevel.WARNING, "OmegaBot:importGuildSettings", `Guild <${guildId}> not found set all to default`);
 			}
+		} catch (error) {
+			Logger(Loglevel.ERROR, "OmegaBot:importGuildSettings", error);
+		}
+		return guildConfig;
+	}
+
+	/**
+	 * import old info files
+	 *
+	 * @protected
+	 * @param {string} guildId
+	 * @memberof OmegaBot
+	 */
+	protected importInfoItemsFromGuild(guildId: string) {
+		try {
+			const dirPath = resolve(process.cwd(), "infos", guildId);
+			readdirSync(dirPath).forEach(fileName => {
+				const filePath = resolve(process.cwd(), "infos", guildId, fileName);
+				const importRawContent = readFileSync(filePath).toString('utf-8');
+				const { data } = JSON.parse(importRawContent);
+
+				const info = new CustomInfo();
+				info.guildId = guildId;
+				info.data = data;
+				info.name = basename(fileName, '.json');
+
+				customInfoCollection.save(info);
+
+				Logger(Loglevel.INFO, "OmegaBot:importInfoItemsFromGuild", `Guild <${guildId}> info <${info.name}> imported`);
+			});
 
 		} catch (error) {
-			Logger(911, "OmegaBot:saveGuildSettings", error);
-			!msg ? null : msg.react("👎");
+			Logger(Loglevel.ERROR, "OmegaBot:importInfoItemsFromGuild", error);
 		}
 	}
 
@@ -132,36 +154,22 @@ export class OmegaBot extends WorkerProcess {
 	 * @param {string} guildId
 	 * @memberof OmegaBot
 	 */
-	protected loadGuildSettings(guildId: string) {
+	protected async loadGuildSettings(guildId: string) {
 		if (this.settingsLoaded.has(guildId) && this.settingsLoaded.get(guildId)) return;
-		let GuildConfig: GuildConfiguration = getDefaultGuildConfiguration();
-		const dataPath = resolve(rootDir, "infos", guildId);
+		// TODO handle external changes with changestreams
+		let guildConfig: GuildConfiguration;
 		try {
-			accessSync(dataPath);
-		} catch (error) {
-			try {
-				mkdirSync(dataPath, { recursive: true });
-			} catch (error) {
-				Logger(911, "OmegaBot:loadGuildSettings", `Unable to create data-directory ${dataPath}`);
-			}
-		}
-		try {
-			const file = resolve(rootDir, "infos", guildId + ".json");
-			try {
-				const dataRaw = readFileSync(file, { encoding: "utf-8" });
-				const importedData = JSON.parse(dataRaw);
-				GuildConfig = Object.assign({}, GuildConfig, this.patchGuildConfig(importedData));
-				Logger(110, "OmegaBot:loadGuildSettings", `Guild <${guildId}> settings found and loaded!`);
-			} catch (error) {
-				Logger(510, "OmegaBot:loadGuildSettings", `Guild <${guildId}> not found set all to default`);
-			} finally {
+			guildConfig = await guildConfigurationCollection.findItem({ guildId });
+			if (guildConfig) {
+				Logger(Loglevel.INFO, "OmegaxBot:loadGuildSettings", `Guild <${guildId}> settings found and loaded!`);
 				this.settingsLoaded.set(guildId, true);
-				this.guildConfigList.set(guildId, GuildConfig);
-				this.saveGuildSettings(guildId);
+			} else {
+				guildConfig = this.importGuildSettings(guildId);
 			}
-
+			this.guildConfigList.set(guildId, guildConfig);
+			this.saveGuildSettings(guildId);
 		} catch (error) {
-			Logger(911, "OmegaBot:loadGuildSettings", error);
+			Logger(Loglevel.ERROR, "OmegaBot:saveGuildSettings", error);
 		}
 	}
 
@@ -173,48 +181,6 @@ export class OmegaBot extends WorkerProcess {
 	 * @memberof OmegaBot
 	 */
 	protected patchGuildConfig(old: GuildConfiguration): GuildConfiguration {
-		// new flag property
-		if (old.allowAll) {
-			if (!old.flags) {
-				old.flags = {
-					allowAll: old.allowAll,
-					sayHello: false,
-					removeJoinCommand: true,
-					removeLeaveCommand: true
-				};
-			} else {
-				old.flags.allowAll = old.allowAll;
-			}
-			delete old.flags;
-		}
-		// new streamer list
-		if (Array.isArray(old.streamerList)) {
-			const newFormat = old.streamerList.map((v: string) => {
-				return {
-					id: v,
-					channelId: null,
-					message: old.streamerMessages && old.streamerMessages[v] ? old.streamerMessages[v] : null,
-				};
-			});
-			old.streamerList = {};
-			newFormat.forEach((v) => old.streamerList[v.id] = v);
-			delete old.streamerMessages;
-		}
-
-		// selfPromotionRoles
-		if (Array.isArray(old.selfPromotionRoles)) {
-			const newFormat = old.selfPromotionRoles.map((v: string) => {
-				return {
-					id: v,
-					channelId: null,
-					alias: null,
-					emojiName: null
-				};
-			});
-			old.selfPromotionRoles = {};
-			newFormat.forEach((v) => old.selfPromotionRoles[v.id] = v);
-		}
-
 		return old;
 	}
 
@@ -243,9 +209,9 @@ export class OmegaBot extends WorkerProcess {
 	 */
 	protected initGuild(G: Guild) {
 		this.loadGuildSettings(G.id);
-		const { botname } = this.guildConfigList.get(G.id);
+		const { botname } = this.guildConfigList.get(G.id) || { botname: null };
 		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
-		Logger(111, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
+		Logger(Loglevel.INFO, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
 		this.initGuildCache(G);
 
 		G.client.off("guildMemberAdd", this.guildMemberAddListener);
@@ -255,7 +221,7 @@ export class OmegaBot extends WorkerProcess {
 			this.streamerChecks.set(G.id, setTimeout(() => {
 				const Guild: Guild = G;
 
-				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
+				const { streamerChannelId, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
 
 				// if (!streamerChannelId) return;
 
@@ -274,7 +240,7 @@ export class OmegaBot extends WorkerProcess {
 					const [Game] = Member.presence.activities.filter(activity => activity.type == "STREAMING" && activity.url);
 					const lastGame = aCache.get(Member.id);
 					const liveDate = aDateCache.get(Member.id);
-					if (Game && Game && (!lastGame || !lastGame) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (allowAll || streamerList[Member.id])) {
+					if (Game && Game && (!lastGame || !lastGame) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (streamerList[Member.id])) {
 						const StreamerConfig = streamerList[Member.id];
 						const channelId = StreamerConfig?.channelId || streamerChannelId;
 						const streamerMessage = StreamerConfig?.message || announcerMessage || `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL`;
@@ -285,7 +251,7 @@ export class OmegaBot extends WorkerProcess {
 							!txtCh ? null : txtCh.send(msg);
 							aDateCache.set(Member.id, new Date());
 						} catch (error) {
-							Logger(911, "OmegaBot:setupDiscordBot", error);
+							Logger(Loglevel.ERROR, "OmegaBot:setupDiscordBot", error);
 						}
 					}
 					aCache.set(Member.id, Game);
@@ -344,7 +310,7 @@ Meldung  = ${GuildConfig.announcerMessage || "standard (nichts angegeben)"}
 
 				const author = msg.author;
 				const member = msg.guild.member(author);
-				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
+				const isDeveloper = this.botConfig?.developerAccess?.includes(member.id);
 				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
 				const guildId: string = msg.guild.id;
 				const GuildConfig = this.guildConfigList.get(guildId);
@@ -371,7 +337,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 					let index = 0;
 					if (response.length > 1900) {
 						let tmp = response.split(EOL);
-						Logger(0, "?help", `response length ${response.length} splitting response into ${tmp.length} pieces for rejoining`);
+						Logger(Loglevel.VERBOSE, "?help", `response length ${response.length} splitting response into ${tmp.length} pieces for rejoining`);
 						while (tmp.length) {
 							if (!responseList[index]) responseList[index] = index < 1 ? "" : "```";
 							let nextLength = responseList[index].length + tmp[0].length;
@@ -432,12 +398,12 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 
 		this.availableBotCommands.set("!remove", {
 			restricted: true,
-			method: (msg, options) => {
+			method: async (msg, options) => {
 				// const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
-				const file = resolve(rootDir, "infos", guildId, options.join(" ").toLowerCase() + ".json");
+				const name: string = options.join(" ").toLowerCase();
 				try {
-					unlinkSync(file);
+					await customInfoCollection.hardRemove({ guildId, name });
 					msg.react("👍");
 				} catch (error) {
 					msg.react("👎");
@@ -450,7 +416,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 		this.availableBotCommands.set("!add", {
 			restricted: true,
 			devOnly: false,
-			method: (msg, options) => {
+			method: async (msg, options) => {
 				// const TC: TextChannel = msg.channel as TextChannel;
 				const guildId: string = msg.guild.id;
 				const [target, ...text] = options;
@@ -458,21 +424,44 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 					msg.react("👎");
 					return;
 				}
-				const file = resolve(rootDir, "infos", guildId, target.toLowerCase() + ".json");
-				let data = null;
-				try {
-					const dataRaw = readFileSync(file);
-					data = JSON.parse(dataRaw.toString());
-					if (Array.isArray(data.data)) {
-						data.data.push(text.join(" "));
-					} else {
-						data.data = [data.data, text.join(" ")];
+				const name = target.toLowerCase();
+				const item = await customInfoCollection.findItem({ guildId, name });
+				const content = text.join(" ");
+				if (item) {
+					if (!isArray(item.data)) {
+						item.data = [item.data];
 					}
-				} catch (error) {
-					data = { data: text.join(" ") };
+					item.data.push(content);
+					try {
+						await customInfoCollection.save(item);
+						msg.react("👍");
+					} catch (error) {
+						msg.react("👎");
+					}
+				} else {
+					const nItem = plainToClass(CustomInfo, { data: content, name, guildId });
+					try {
+						await customInfoCollection.save(nItem);
+						msg.react("👍");
+					} catch (error) {
+						msg.react("👎");
+					}
 				}
-				writeFileSync(file, JSON.stringify(data, null, 2));
-				msg.react("👍");
+				// const file = resolve(rootDir, "infos", guildId, target.toLowerCase() + ".json");
+				// let data = null;
+				// try {
+				// 	const dataRaw = readFileSync(file);
+				// 	data = JSON.parse(dataRaw.toString());
+				// 	if (Array.isArray(data.data)) {
+				// 		data.data.push(text.join(" "));
+				// 	} else {
+				// 		data.data = [data.data, text.join(" ")];
+				// 	}
+				// } catch (error) {
+				// 	data = { data: text.join(" ") };
+				// }
+				// writeFileSync(file, JSON.stringify(data, null, 2));
+				// msg.react("👍");
 			},
 			help: `!add [was] [text]`.padEnd(40, " ") + "| Füge einen neuen text hinzu der per ?[was] wieder abgerufen werden kann, zum Beispiel Zitate oder Infos",
 			helpId: "HELP_ADD"
@@ -755,16 +744,18 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const TC: TextChannel = msg.channel as TextChannel;
 				const check = TC.permissionsFor(TC.guild.me).has("ATTACH_FILES");
 				if (check) {
-					let message = `Ok hier der angeforderte Datenexport für dich <@!${Author.id}>`;
-					let attachment: MessageAttachment = null;
-					const file = resolve(rootDir, "infos", msg.guild.id + ".json");
-					try {
-						const rawFileContent = readFileSync(file);
-						attachment = new MessageAttachment(rawFileContent, msg.guild.id + ".json");
-					} catch (error) {
-						message = `Huch, da lief was falsch, sorry! Bitte dem Entwickler melden: \n\`${error}\``;
-					}
-					TC.send(message, attachment);
+					TC.send(`Tut mir leid, aber diese Funktion wird aktuell überarbeitet - oder auch entfernt, schaue später wieder`);
+					return;
+					// let message = `Ok hier der angeforderte Datenexport für dich <@!${Author.id}>`;
+					// let attachment: MessageAttachment = null;
+					// const file = resolve(rootDir, "infos", msg.guild.id + ".json");
+					// try {
+					// 	const rawFileContent = readFileSync(file);
+					// 	attachment = new MessageAttachment(rawFileContent, msg.guild.id + ".json");
+					// } catch (error) {
+					// 	message = `Huch, da lief was falsch, sorry! Bitte dem Entwickler melden: \n\`${error}\``;
+					// }
+					// TC.send(message, attachment);
 				} else {
 					TC.send(`Tut mir leid, aber ich habe nicht die nötigen Rechte um Dateien anzuhängen`);
 				}
@@ -949,181 +940,189 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 	 * @returns {void}
 	 * @memberof OmegaBot
 	 */
-	protected setupDiscordBot(): void {
-		if (!OmegaBot?.NodeConfig?.enabled) {
-			Logger(511, "OmegaBot:setupDiscordBot", `Discord not enabled.`);
+	protected async setupDiscordBot(): Promise<void> {
+
+		this.botConfig = await botNodeCollection.getItem(this.botNodeId);
+
+		console.log(this.botConfig, this.botNodeId);
+
+		if (!this.botConfig?.enabled) {
+			Logger(Loglevel.WARNING, "OmegaBot:setupDiscordBot", `Discord not enabled.`);
 			return;
-		} else {
-			this.DiscordBot = new Client();
-			this.DiscordBot.on('ready', () => {
-				Logger(111, "OmegaBot:setupDiscordBot", `Logged in as ${this.DiscordBot.user.tag}!`);
-
-				this.DiscordBot.guilds.cache.forEach((G, key) => {
-					this.initGuild(G);
-				});
-			});
-
-			this.DiscordBot.on("guildCreate", (guild) => {
-				this.initGuild(guild);
-				try {
-					Logger(110, "DiscordBot.on->guildCreate", `Just joined new Guild ${guild.name} with ${guild.memberCount} members`);
-					const publicCH = guild.channels.cache.find((GC) => GC.type == "text" && GC.permissionsFor(guild.me).has("SEND_MESSAGES"));
-					(<TextChannel>guild.systemChannel || <TextChannel>publicCH).send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
-				} catch (error) {
-					Logger(911, "DiscordBot.on->guildCreate", error);
-				}
-			});
-
-			this.DiscordBot.on('messageReactionAdd', async (messageReaction, user) => {
-				if (user.bot || messageReaction.message.channel.type !== "text") {
-					return; // dont handle bot reactions
-				}
-				const { emoji, message } = messageReaction;
-				const guildId = message.guild.id;
-				const TC = message.channel as TextChannel;
-				const { selfPromotionRoles } = this.guildConfigList.get(guildId);
-				const [role] = Object.keys(selfPromotionRoles).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
-				Logger(0, "DiscordBot.on->messageReactionAdd", `${user.username} reacted with <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
-				if (role) {
-					const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
-					if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
-						return; // not allowed in this channel
-					}
-					const Role = await message.guild.roles.fetch(role.id);
-					if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
-						message.guild.member(user.id).roles.add(Role);
-					} else {
-						Logger(0, "DiscordBot.on->messageReactionAdd", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
-					}
-				}
-
-			});
-
-			this.DiscordBot.on('messageReactionRemove', async (messageReaction, user) => {
-				if (user.bot || messageReaction.message.channel.type !== "text") {
-					return; // dont handle bot reactions
-				}
-				const { emoji, message } = messageReaction;
-				const guildId = message.guild.id;
-				const TC = message.channel as TextChannel;
-				const { selfPromotionRoles } = this.guildConfigList.get(guildId);
-				const [role] = Object.keys(selfPromotionRoles).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
-				Logger(0, "DiscordBot.on->messageReactionRemove", `${user.username} removed reaction <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
-				if (role) {
-					const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
-					if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
-						return; // not allowed in this channel
-					}
-					const Role = await message.guild.roles.fetch(role.id);
-					if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
-						message.guild.member(user.id).roles.remove(Role);
-					} else {
-						Logger(0, "DiscordBot.on->messageReactionRemove", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
-					}
-				}
-
-			});
-
-			this.DiscordBot.on('messageReactionRemoveAll', (message) => {
-				// Logger(0, "DiscordBot.on->messageReactionRemoveAll", message);
-			});
-
-			this.DiscordBot.on('message', async msg => {
-				if (!msg.guild) return;
-				// ignore bot messages
-				if (msg.author.bot) {
-					return;
-				}
-				const guildId: string = msg.guild.id;
-				const me = msg.guild.me;
-				const TC: TextChannel = msg.channel as TextChannel;
-				const author = msg.author;
-				const member = await msg.guild.member(author);
-				const isDeveloper = OmegaBot.NodeConfig.developerAccess && OmegaBot.NodeConfig.developerAccess.includes(member.id);
-				const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
-				const isCommand = msg.content.startsWith('?') || msg.content.startsWith('!');
-				const GuildConfig = this.guildConfigList.get(guildId);
-				const { streamerChannelId, allowAll, streamerList, announcementDelayHours, announcerMessage, commandPermissions, streamerMessages, selfPromotionRoles } = GuildConfig;
-				const [isAliasFor] = Object.keys(selfPromotionRoles).filter(role => msg.content === selfPromotionRoles[role].alias);
-
-				// ignore all other messages
-				if (!isCommand) {
-					if (isAliasFor) {
-						const role = selfPromotionRoles[isAliasFor];
-						Logger(0, "DiscordBot.on->message", `Member used alias <${role.alias}> for ${role.id}`);
-						const guildRole = await msg.guild.roles.fetch(role.id);
-						const isCorrectChannel = role.channelId.includes(TC.id);
-
-						if (isCorrectChannel) member.roles.add(guildRole);
-					} else {
-						Logger(0, "DiscordBot.on->message", `Unhandled message <${msg.content}> from ${author.username}`);
-					}
-					return;
-				}
-
-				const [command, ...options] = msg.content.split(" ");
-				if (!this.availableBotCommands.has(command)) {
-					if (!msg.content.startsWith('?')) {
-						msg.react("👎");
-						TC.send(`Also dieser Befehl ist mir unbekannt! Probier doch mal \`?help\` `);
-					} else {
-						const datadir = resolve(rootDir, "infos", guildId);
-						const file = resolve(datadir, command.replace("?", "").toLowerCase() + ".json");
-						try {
-							const dataRaw = readFileSync(file);
-							const data = JSON.parse(dataRaw.toString());
-							if (Array.isArray(data.data)) {
-								shuffle(data.data);
-								TC.send(data.data[0]);
-							} else {
-								TC.send(data.data);
-							}
-						} catch (error) {
-							TC.send(`Darüber (${command}) weiss ich überhaupt gar nichts!`);
-						}
-					}
-					return;
-				}
-
-				const boco = this.availableBotCommands.get(command);
-
-				if (boco.devOnly && !isDeveloper) {
-					msg.react("👎");
-					TC.send(`Ey! Dieser Befehl ist für den Entwickler reserviert, lass deine Finger davon!`);
-					return;
-				}
-
-				if (boco.restricted && !isAdmin && (!commandPermissions[command] || !commandPermissions[command].includes(member.id))) {
-					msg.react("👎");
-					TC.send(`Moment mal! Dieser Befehl ist für bestimmte Personen zugelassen und du gehörst... NICHT dazu!`);
-					return;
-				}
-
-				boco.method(msg, options);
-				return;
-
-			});
-
-			this.DiscordBot.on("error", (e: Error) => {
-				Logger(911, "OmegaBot:setupDiscordBot@error", e);
-			});
-
-			this.DiscordBot.on("warn", (w) => {
-				Logger(511, "OmegaBot:setupDiscordBot@warn", w);
-			});
-
-			this.DiscordBot.on("debug", (d) => {
-				Logger(-1, "OmegaBot:setupDiscordBot@debug", d);
-			});
-
-			this.DiscordBot.on("rateLimit", (limit) => {
-				Logger(1, "OmegaBot:setupDiscordBot@rateLimit", limit);
-			});
-
-			this.DiscordBot.login(OmegaBot.NodeConfig.token).catch(e => {
-				Logger(911, "OmegaBot:setupDiscordBot->login", e);
-			});
 		}
+
+		this.DiscordBot = new Client();
+		this.DiscordBot.on('ready', () => {
+			Logger(Loglevel.INFO, "OmegaBot:setupDiscordBot", `Logged in as ${this.DiscordBot.user.tag}!`);
+
+			this.DiscordBot.guilds.cache.forEach((G, key) => {
+				this.initGuild(G);
+			});
+		});
+
+
+
+		this.DiscordBot.on("guildCreate", (guild) => {
+			this.initGuild(guild);
+			try {
+				Logger(Loglevel.INFO, "DiscordBot.on->guildCreate", `Just joined new Guild ${guild.name} with ${guild.memberCount} members`);
+				const publicCH = guild.channels.cache.find((GC) => GC.type == "text" && GC.permissionsFor(guild.me).has("SEND_MESSAGES"));
+				(<TextChannel>guild.systemChannel || <TextChannel>publicCH).send(`Hey cool, da bin ich! Tippe \`?help\` und ich sage dir was ich kann!`);
+			} catch (error) {
+				Logger(Loglevel.ERROR, "DiscordBot.on->guildCreate", error);
+			}
+		});
+
+		this.DiscordBot.on('messageReactionAdd', async (messageReaction, user) => {
+			if (user.bot || messageReaction.message.channel.type !== "text") {
+				return; // dont handle bot reactions
+			}
+			const { emoji, message } = messageReaction;
+			const guildId = message.guild.id;
+			const TC = message.channel as TextChannel;
+			const { selfPromotionRoles } = this.guildConfigList.get(guildId);
+			const [role] = (selfPromotionRoles ? Object.keys(selfPromotionRoles) : []).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
+			Logger(Loglevel.VERBOSE, "DiscordBot.on->messageReactionAdd", `${user.username} reacted with <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
+			if (role) {
+				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+				if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
+					return; // not allowed in this channel
+				}
+				const Role = await message.guild.roles.fetch(role.id);
+				if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
+					message.guild.member(user.id).roles.add(Role);
+				} else {
+					Logger(Loglevel.VERBOSE, "DiscordBot.on->messageReactionAdd", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
+				}
+			}
+
+		});
+
+		this.DiscordBot.on('messageReactionRemove', async (messageReaction, user) => {
+			if (user.bot || messageReaction.message.channel.type !== "text") {
+				return; // dont handle bot reactions
+			}
+			const { emoji, message } = messageReaction;
+			const guildId = message.guild.id;
+			const TC = message.channel as TextChannel;
+			const { selfPromotionRoles } = this.guildConfigList.get(guildId);
+			const [role] = Object.keys(selfPromotionRoles).filter(roleId => selfPromotionRoles[roleId].emojiName == emoji.name).map(roleId => selfPromotionRoles[roleId]);
+			Logger(Loglevel.VERBOSE, "DiscordBot.on->messageReactionRemove", `${user.username} removed reaction <${emoji.name}> (ID:${emoji.id}) connected role <${role?.id}>`);
+			if (role) {
+				const check = TC.permissionsFor(TC.guild.me).has("MANAGE_ROLES");
+				if (!check || role.channelId.length > 0 && !role.channelId.includes(TC.id)) {
+					return; // not allowed in this channel
+				}
+				const Role = await message.guild.roles.fetch(role.id);
+				if (Role.comparePositionTo(message.guild.me.roles.highest) < 0) {
+					message.guild.member(user.id).roles.remove(Role);
+				} else {
+					Logger(Loglevel.VERBOSE, "DiscordBot.on->messageReactionRemove", `Highest bot role vs. role position: ${Role.comparePositionTo(message.guild.me.roles.highest)}`);
+				}
+			}
+
+		});
+
+		this.DiscordBot.on('messageReactionRemoveAll', (message) => {
+			// Logger(Loglevel.VERBOSE, "DiscordBot.on->messageReactionRemoveAll", message);
+		});
+
+
+		this.DiscordBot.on('message', async msg => {
+			if (!msg.guild) return;
+			// ignore bot messages
+			if (msg.author.bot) {
+				return;
+			}
+			const guildId: string = msg.guild.id;
+			const me = msg.guild.me;
+			const TC: TextChannel = msg.channel as TextChannel;
+			const author = msg.author;
+			const member = await msg.guild.member(author);
+			const isDeveloper = this.botConfig?.developerAccess?.includes(member.id);
+			const isAdmin = member.hasPermission("ADMINISTRATOR") || isDeveloper;
+			const isCommand = msg.content.startsWith('?') || msg.content.startsWith('!');
+			const GuildConfig = this.guildConfigList.get(guildId);
+			const { streamerChannelId, streamerList, announcementDelayHours, announcerMessage, commandPermissions, selfPromotionRoles } = GuildConfig;
+			const [isAliasFor] = (selfPromotionRoles ? Object.keys(selfPromotionRoles) : []).filter(role => msg.content === selfPromotionRoles[role].alias);
+
+			// ignore all other messages
+			if (!isCommand) {
+				if (isAliasFor) {
+					const role = selfPromotionRoles[isAliasFor];
+					Logger(Loglevel.VERBOSE, "DiscordBot.on->message", `Member used alias <${role.alias}> for ${role.id}`);
+					const guildRole = await msg.guild.roles.fetch(role.id);
+					const isCorrectChannel = role.channelId.includes(TC.id);
+
+					if (isCorrectChannel) member.roles.add(guildRole);
+				} else {
+					Logger(Loglevel.VERBOSE, "DiscordBot.on->message", `Unhandled message <${msg.content}> from ${author.username}`);
+				}
+				return;
+			}
+
+			const [command, ...options] = msg.content.split(" ");
+			if (!this.availableBotCommands.has(command)) {
+				if (!msg.content.startsWith('?')) {
+					msg.react("👎");
+					TC.send(`Also dieser Befehl ist mir unbekannt! Probier doch mal \`?help\` `);
+				} else {
+					const infoName = command.replace("?", "").toLowerCase();
+					const customInfo = await customInfoCollection.findItem({ guildId: guildId, name: infoName });
+					// TODO globalInfo?
+					if (customInfo) {
+						if (Array.isArray(customInfo.data)) {
+							shuffle(customInfo.data);
+							TC.send(customInfo.data[0]);
+						} else {
+							TC.send(customInfo.data);
+						}
+					} else {
+						TC.send(`Darüber (${command}) weiss ich überhaupt gar nichts!`);
+					}
+				}
+				return;
+			}
+
+			const boco = this.availableBotCommands.get(command);
+
+			if (boco.devOnly && !isDeveloper) {
+				msg.react("👎");
+				TC.send(`Ey! Dieser Befehl ist für den Entwickler reserviert, lass deine Finger davon!`);
+				return;
+			}
+
+			if (boco.restricted && !isAdmin && (!commandPermissions[command] || !commandPermissions[command].includes(member.id))) {
+				msg.react("👎");
+				TC.send(`Moment mal! Dieser Befehl ist für bestimmte Personen zugelassen und du gehörst... NICHT dazu!`);
+				return;
+			}
+
+			boco.method(msg, options);
+			return;
+
+		});
+
+		this.DiscordBot.on("error", (e: Error) => {
+			Logger(Loglevel.ERROR, "OmegaBot:setupDiscordBot@error", e);
+		});
+
+		this.DiscordBot.on("warn", (w) => {
+			Logger(Loglevel.WARNING, "OmegaBot:setupDiscordBot@warn", w);
+		});
+
+		this.DiscordBot.on("debug", (d) => {
+			Logger(-1, "OmegaBot:setupDiscordBot@debug", d);
+		});
+
+		this.DiscordBot.on("rateLimit", (limit) => {
+			Logger(Loglevel.DEBUG, "OmegaBot:setupDiscordBot@rateLimit", limit);
+		});
+
+		this.DiscordBot.login(this.botConfig.token).catch(e => {
+			Logger(Loglevel.ERROR, "OmegaBot:setupDiscordBot->login", e);
+		});
+
 	}
 
 	/**
@@ -1140,11 +1139,11 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const TC: TextChannel = channel as TextChannel;
 				try {
 					const messages = await TC.messages.fetch({ limit: 100 }, true);
-					Logger(0, "OmegaBot:initGuildCache", `loaded ${messages.size} messages from ${TC.name}`);
+					Logger(Loglevel.VERBOSE, "OmegaBot:initGuildCache", `loaded ${messages.size} messages from ${TC.name}`);
 				} catch (error) {
 					// no access == 50001
 					if (error.code !== 50001) {
-						Logger(911, "OmegaBot:initGuildCache", error);
+						Logger(Loglevel.ERROR, "OmegaBot:initGuildCache", error);
 					}
 				}
 			}
@@ -1166,7 +1165,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 		const Author = m.author;
 
 		TC.messages.fetch({ before: startId, limit: 100 }).then(async (msgList) => {
-			Logger(11, "OmegaBot.clearTextChannel", `Found ${msgList.size} messages in ${TC.guild.name}/${TC.name} to delete`);
+			Logger(Loglevel.DEBUG, "OmegaBot.clearTextChannel", `Found ${msgList.size} messages in ${TC.guild.name}/${TC.name} to delete`);
 			const idList = msgList.keyArray();
 			const deleteQueue = [];
 			for (let i = 0; i < idList.length; i++) {
@@ -1174,7 +1173,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				const msg = msgList.get(msgId);
 				msg && !msg.pinned && msg.deletable && msg.id != m.id ? deleteQueue.push(msg.delete()) : null;
 			}
-			await Promise.all(deleteQueue).catch(e => Logger(911, "OmegaBot.clearTextChannel", e.message));
+			await Promise.all(deleteQueue).catch(e => Logger(Loglevel.ERROR, "OmegaBot.clearTextChannel", e.message));
 			const startChk = startMsg && startMsg.deletable && !startMsg.pinned && startMsg.id != m.id;
 			startChk ? await startMsg.delete() : null; // will only trigger once since message is deleted in the first loop
 			const total = d + idList.length + (startChk ? 1 : 0);
@@ -1190,7 +1189,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				// 	await m.react("🇪");
 				// 	await m.react(encodeURIComponent("\u25B6"));
 				// } catch (e) {
-				// 	Logger(911, "OmegaBot.clearTextChannel", e.message);
+				// 	Logger(Loglevel.ERROR, "OmegaBot.clearTextChannel", e.message);
 				// }
 
 				// const totalDigits = total.toString().split("").map((s) => Number(s));
@@ -1198,7 +1197,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 				// for (let i = 0; i < totalDigits.length; i++) {
 				// 	const digit = totalDigits[i];
 				// 	const emoji = encodeURIComponent(reactionNumbers[digit]);
-				// 	await m.react(emoji).catch(e => Logger(911, "OmegaBot.clearTextChannel", e.message, emoji, digit));
+				// 	await m.react(emoji).catch(e => Logger(Loglevel.ERROR, "OmegaBot.clearTextChannel", e.message, emoji, digit));
 				// }
 			}
 		});

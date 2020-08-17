@@ -1,19 +1,34 @@
 {
 	"name": "omega_discord_bot",
-	"version": "0.8.2",
+	"version": "0.9.0",
+	"main": "dist/app.js",
+	"engines": {
+		"node": ">=10.0.0"
+	},
 	"scripts": {
-		"start": "node bin/main"
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
+		"start": "tsc;node dist/app",
+		"start:prod": "node dist/app"
 	},
 	"private": true,
 	"dependencies": {
 		"bufferutil": "^4.0.1",
-		"discord.js": "^12.2.0",
-		"jdenticon": "^2.2.0",
-		"rxjs": "^6.5.5",
-		"ws": "^7.2.3"
+		"class-transformer": "^0.3.1",
+		"class-validator": "^0.12.2",
+		"discord.js": "^12.3.1",
+		"jdenticon": "^3.0.1",
+		"module-alias": "^2.2.2",
+		"mongodb": "^3.6.0",
+		"rxjs": "^6.6.2",
+		"ws": "^7.3.1"
 	},
 	"devDependencies": {
-		"@types/node": "^12.7.7",
-		"@types/ws": "^7.2.4"
+		"@types/mongodb": "^3.5.26",
+		"@types/node": "^14.0.27",
+		"@types/ws": "^7.2.6",
+		"typescript": "^3.9.7"
+	},
+	"_moduleAliases": {
+		"@": "dist"
 	}
 }

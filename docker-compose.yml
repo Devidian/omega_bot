@@ -1,0 +1,42 @@
+version: '3.1'
+services:
+
+  omegabot:
+    build: .
+    restart: always
+    ports:
+      - 47110:47110
+    depends_on:
+      - mongo
+    networks:
+      - omeganet
+    environment:
+      APP_TITLE: ${APP_TITLE}
+      APP_CLI_PORT: ${APP_CLI_PORT}
+      APP_TICK: ${APP_TICK}
+      APP_LOGLEVEL: ${APP_LOGLEVEL}
+      APP_LOGCOLOR: ${APP_LOGCOLOR}
+      SECRET: ${SECRET}
+      MONGODB_APPNAME: ${MONGODB_APPNAME}
+      MONGODB_URI: ${MONGODB_URI}
+      DEFAULT_BOTNODE: ${DEFAULT_BOTNODE}
+
+  mongo:
+    image: mongo
+    restart: always
+    volumes:
+      - mongodata:/data/db
+    hostname: mongohost
+    ports:
+      - 27017:27017
+    networks:
+      - omeganet
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+
+volumes:
+  mongodata:
+
+networks:
+  omeganet:

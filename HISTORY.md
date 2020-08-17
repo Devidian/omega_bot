@@ -1,5 +1,17 @@
 ## [Unreleased]
 
+## [0.9.0] - 2020-17-08
+### Added 
+- `Dockerfile` for docker
+- MongoDB for saving configs and settings.
+- `docker-composer.yml` for connected mongo docker service
+
+### Changed
+- refactored project structure (WIP)
+- using `yarn` now instead of `npm`
+- upgraded dependencies to latest
+- using dotenv now instead of json configs
+
 ## [0.8.3] - 2019-22-04
 ### Fixed
 - bug in `initGuild` unhandled exception
