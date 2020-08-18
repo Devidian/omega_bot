@@ -17,6 +17,12 @@ https://discordapp.com/oauth2/authorize?client_id=606078021497258004&scope=bot&p
 OmegaBot:
 https://discordapp.com/oauth2/authorize?client_id=608270517568274462&scope=bot&permissions=335801408
 
+## docker-compose
+```bash
+# create .env file with your settings
+docker-compose up -d
+```
+
 ## Usage
 
 |Command|Description|Permission|

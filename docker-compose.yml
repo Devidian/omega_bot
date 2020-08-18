@@ -4,6 +4,7 @@ services:
   omegabot:
     build: .
     restart: always
+    container_name: node_omegabot
     ports:
       - 47110:47110
     depends_on:
@@ -24,6 +25,7 @@ services:
   mongo:
     image: mongo
     restart: always
+    container_name: omega_mongodb
     volumes:
       - mongodata:/data/db
     hostname: mongohost

@@ -20,7 +20,6 @@ ENV NODE_ENV=production
 
 COPY --from=builder "/app/dist/" "/app/dist"
 COPY --from=builder "/app/package.json" "/app/package.json"
-COPY "./infos" "/app/infos/"
 
 RUN yarn --production
 
