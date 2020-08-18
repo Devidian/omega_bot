@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.9.1] - 2020-18-08
+### Fixed
+- incorrect env variables in `Logger` used
+
 ## [0.9.0] - 2020-17-08
 ### Added 
 - `Dockerfile` for docker

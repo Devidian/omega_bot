@@ -1,6 +1,6 @@
 {
 	"name": "omega_discord_bot",
-	"version": "0.9.0",
+	"version": "0.9.1",
 	"main": "dist/app.js",
 	"engines": {
 		"node": ">=10.0.0"
