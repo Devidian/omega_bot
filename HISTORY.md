@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.9.2] - 2020-22-10
+### Fixed
+- On first boot when no bot is configured, start is delayed for 5 seconds
+- On `disconnect` bots should try to restart now
+- crash fix on `OmegaBot.guildMemberAddListener` (should log error now to fix issue later)
+### Added
+- env `APP_LOGDATE` added to prepend date on logs if true|1
+
 ## [0.9.1] - 2020-18-08
 ### Fixed
 - incorrect env variables in `Logger` used

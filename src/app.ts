@@ -5,6 +5,7 @@ import { isMaster, worker, fork as forkChild, setupMaster, Worker as clusterWork
 import { BehaviorSubject } from 'rxjs';
 import { Server } from "ws";
 import { ObjectId, ObjectID } from 'mongodb';
+import { BotNodeConfig } from './app/models/bot-node-config';
 
 
 const [cwd, app, botId, ...appArguments] = process.argv;
@@ -12,6 +13,7 @@ const [cwd, app, botId, ...appArguments] = process.argv;
 let cliServer: Server = null;
 let botNodes: clusterWorker[] = [];
 let flagReboot: boolean = false;
+let flagShutdown: boolean = false;
 
 /**
  * starting a bot
@@ -39,6 +41,54 @@ async function initWorker() {
                 break;
         }
     });
+
+    process.on('SIGILL', () => flagShutdown = true);
+}
+
+function startNode(node: BotNodeConfig) {
+    if (!node.enabled || flagShutdown) return null;
+    let W: clusterWorker = null;
+
+    setupMaster({
+        exec: app,
+        args: [node._id + '']
+    });
+    W = forkChild();
+
+    // W.on("exit", (c: number, s: string) => {
+    //     if (this.nodeList.has(type)) {
+    //         this.nodeList.get(type).get(nodeId).removeAllListeners();
+    //         this.nodeList.get(type).delete(nodeId);
+    //         this.flagWatchFile.set(type, false);
+    //     }
+    //     if (this.flagReboot) {
+    //         Logger(120, 'app', '[Master]', `Worker[${W.id}/${type}]: exited (reboot)`);
+
+    //         if (this.activeNodes < 1) {
+    //             Logger(120, 'app', '[Master]', `All worker shut down, exit now for reboot`);
+    //             this.cleanExit();
+    //         }
+    //     } else {
+    //         Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${type}]: exited`);
+    //         this.bootWorker(type);
+    //     }
+    // });
+
+    W.on("close", (c: number, s: string) => {
+        Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: closed`);
+    }).on("disconnect", () => {
+        Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: disconnected`);
+        W.removeAllListeners();
+        startNode(node);
+    }).on("error", (e: Error) => {
+        Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: error ${e.toString()}`);
+    }).on("message", (msg: any) => {
+        if (msg.type == "ABC") {
+        } else {
+            Logger(20, 'app', '[Master]', `Worker[${W.id}/${node.name}]: ${msg.type}`);
+        }
+    });
+    return W;
 }
 
 /**
@@ -46,59 +96,22 @@ async function initWorker() {
  *
  * @returns
  */
-async function startNodes() {
+async function startNodes(delayed = false) {
     await MongoDB.config(); // Setup MongoDB
 
     const { botNodeCollection } = await import('@/app/models/bot-node-config/bot-node-config.collection');
 
     const nodeList = await botNodeCollection.getAll();
+    // on first startup when db is initialized, we might not get the default node back
+    // so we delay here for 5 seconds and try again, but only once
+    if (nodeList.length < 1 && !delayed) {
+        return setTimeout(() => startNodes(true), 5000);
+    }
     Logger(Loglevel.INFO, 'app', `found ${nodeList.length} bot nodes`);
 
     if (nodeList.length < 1) return;
 
-    return nodeList.map(node => {
-        if (!node.enabled) return null;
-        let W: clusterWorker = null;
-
-        setupMaster({
-            exec: app,
-            args: [node._id + '']
-        });
-        W = forkChild();
-
-        // W.on("exit", (c: number, s: string) => {
-        //     if (this.nodeList.has(type)) {
-        //         this.nodeList.get(type).get(nodeId).removeAllListeners();
-        //         this.nodeList.get(type).delete(nodeId);
-        //         this.flagWatchFile.set(type, false);
-        //     }
-        //     if (this.flagReboot) {
-        //         Logger(120, 'app', '[Master]', `Worker[${W.id}/${type}]: exited (reboot)`);
-
-        //         if (this.activeNodes < 1) {
-        //             Logger(120, 'app', '[Master]', `All worker shut down, exit now for reboot`);
-        //             this.cleanExit();
-        //         }
-        //     } else {
-        //         Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${type}]: exited`);
-        //         this.bootWorker(type);
-        //     }
-        // });
-
-        W.on("close", (c: number, s: string) => {
-            Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: closed`);
-        }).on("disconnect", () => {
-            Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: disconnected`);
-        }).on("error", (e: Error) => {
-            Logger(Loglevel.WARNING, 'app', '[Master]', `Worker[${W.id}/${node.name}]: error ${e.toString()}`);
-        }).on("message", (msg: any) => {
-            if (msg.type == "ABC") {
-            } else {
-                Logger(20, 'app', '[Master]', `Worker[${W.id}/${node.name}]: ${msg.type}`);
-            }
-        });
-        return W;
-    });
+    return nodeList.map(node => startNode(node));
 }
 
 function setupCLIServer() {

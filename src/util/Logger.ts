@@ -2,7 +2,8 @@ import { LOGTAG, ConsoleColors } from "./enums";
 
 export function Logger(level: number, source: string, ...messages: any[]): void {
     const currentLevel = process.env.APP_LOGLEVEL || 0;
-    const useColor = [1,'1',true,'true'].includes(process.env.APP_LOGCOLOR.toLowerCase());
+    const useColor = [1, '1', true, 'true'].includes(process.env.APP_LOGCOLOR.toLowerCase());
+    const prependDate = [1, '1', true, 'true'].includes(process.env.APP_LOGDATE.toLowerCase()) ? (new Date()).toISOString()+" " : "";
 
     if (level < currentLevel) {
         return;
@@ -23,8 +24,8 @@ export function Logger(level: number, source: string, ...messages: any[]): void 
         color = ConsoleColors.FG_MAGENTA;
     }
     if (useColor) {
-        console.log(color + levelTag + ConsoleColors.RESET, `[${source}]`, ...messages);
+        console.log(prependDate + color + levelTag + ConsoleColors.RESET, `[${source}]`, ...messages);
     } else {
-        console.log(levelTag, `[${source}]`, ...messages);
+        console.log(prependDate + levelTag, `[${source}]`, ...messages);
     }
 }
