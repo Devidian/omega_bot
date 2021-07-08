@@ -211,11 +211,11 @@ export class OmegaBot extends WorkerProcess {
 	 * @param {Guild} G
 	 * @memberof OmegaBot
 	 */
-	protected initGuild(G: Guild) {
+	protected async initGuild(G: Guild) {
 		this.loadGuildSettings(G.id);
 		const { botname } = this.guildConfigList.get(G.id) || { botname: null };
 		if (botname && G.me.hasPermission(Permissions.FLAGS.CHANGE_NICKNAME)) G.me.setNickname(botname);
-		Logger(Loglevel.INFO, "OmegaBot:setupDiscordBot", `I'am member of ${G.name} with ${G.memberCount} members`);
+		Logger(Loglevel.INFO, "OmegaBot:initGuild", `I'am member of ${G.name} with ${G.memberCount} members`);
 		this.initGuildCache(G);
 
 		G.client.off("guildMemberAdd", this.guildMemberAddListener);
@@ -225,7 +225,7 @@ export class OmegaBot extends WorkerProcess {
 			this.streamerChecks.set(G.id, setTimeout(() => {
 				const Guild: Guild = G;
 
-				const { streamerChannelId, streamerList, announcementDelayHours, announcerMessage } = this.guildConfigList.get(G.id);
+				const { streamerChannelId, streamerList, announcementDelayHours, announcerMessage, flags } = this.guildConfigList.get(G.id);
 
 				// if (!streamerChannelId) return;
 
@@ -244,7 +244,13 @@ export class OmegaBot extends WorkerProcess {
 					const [Game] = Member.presence.activities.filter(activity => activity.type == "STREAMING" && activity.url);
 					const lastGame = aCache.get(Member.id);
 					const liveDate = aDateCache.get(Member.id);
-					if (Game && Game && (!lastGame || !lastGame) && (!liveDate || liveDate.getTime() < blockTime.getTime()) && (streamerList[Member.id])) {
+					// Streamer is in the streamer List or all streamers are allowed
+					const isAllowedStreamer = !!(streamerList[Member.id] || flags.allowAll);
+					// Game is set and unequal to the last Game
+					const isNewGame = Game && (!lastGame || Game !== lastGame);
+					// Not yet announced or announcement is before block date
+					const notBlocked = !liveDate || liveDate.getTime() < blockTime.getTime();
+					if (isAllowedStreamer && isNewGame && notBlocked) {
 						const StreamerConfig = streamerList[Member.id];
 						const channelId = StreamerConfig?.channelId || streamerChannelId;
 						const streamerMessage = StreamerConfig?.message || announcerMessage || `Achtung! PH_USERNAME ist jetzt Live mit <PH_GAME_NAME / PH_GAME_DETAIL> Siehe hier: PH_GAME_URL`;
@@ -1154,7 +1160,7 @@ ${Array.from(this.availableBotCommands.values()).filter(v => !v.devOnly && !v.re
 	 * @param {Guild} guild
 	 * @memberof OmegaBot
 	 */
-	protected initGuildCache(guild: Guild) {
+	protected async initGuildCache(guild: Guild) {
 
 		guild.channels.cache.forEach(async channel => {
 			if (channel.type == "text") {

@@ -105,9 +105,10 @@ async function startNodes(delayed = false) {
     // on first startup when db is initialized, we might not get the default node back
     // so we delay here for 5 seconds and try again, but only once
     if (nodeList.length < 1 && !delayed) {
+        Logger(Loglevel.VERBOSE, 'app', `found ${nodeList.length} bot nodes - starting delayed`);
         return setTimeout(() => startNodes(true), 5000);
     }
-    Logger(Loglevel.INFO, 'app', `found ${nodeList.length} bot nodes`);
+    Logger(Loglevel.INFO, 'app', `found ${nodeList.length} bot nodes - please restart`);
 
     if (nodeList.length < 1) return;
 

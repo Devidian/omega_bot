@@ -1,6 +1,12 @@
 ## [Unreleased]
 
-## [0.9.2] - 2020-22-10
+## [0.9.3] - 2021-07-08
+
+### Fixed
+- Streamer announcement ignored `allowAll` flag
+- incorrect date format in `HISTORY.md` file
+
+## [0.9.2] - 2020-10-22
 ### Fixed
 - On first boot when no bot is configured, start is delayed for 5 seconds
 - On `disconnect` bots should try to restart now
@@ -8,11 +14,11 @@
 ### Added
 - env `APP_LOGDATE` added to prepend date on logs if true|1
 
-## [0.9.1] - 2020-18-08
+## [0.9.1] - 2020-08-18
 ### Fixed
 - incorrect env variables in `Logger` used
 
-## [0.9.0] - 2020-17-08
+## [0.9.0] - 2020-08-17
 ### Added 
 - `Dockerfile` for docker
 - MongoDB for saving configs and settings.
@@ -24,19 +30,19 @@
 - upgraded dependencies to latest
 - using dotenv now instead of json configs
 
-## [0.8.3] - 2019-22-04
+## [0.8.3] - 2019-04-22
 ### Fixed
 - bug in `initGuild` unhandled exception
 
-## [0.8.2] - 2019-21-04
+## [0.8.2] - 2019-04-21
 ### Removed
 - obsolete packages removed
 
-## [0.8.1] - 2019-21-04
+## [0.8.1] - 2019-04-21
 ### Fixed
 - `?roles` command
 
-## [0.8.0] - 2019-21-04
+## [0.8.0] - 2019-04-21
 ### Fixed
 - moved `guildMemberAdd` listener to method.
 - fetch guild from GuildMember in `guildMemberAdd` listener
@@ -57,17 +63,17 @@
 - new `!unset role @role|roleId` command to unset selfPromotionRoles
 - bot can now use Guild emoji reactions to join or leave roles
 
-## [0.7.0] - 2019-26-09
+## [0.7.0] - 2019-09-26
 ### Added
 - new commands
   - type `set welcomeMsg [text]` to change the bot-welcome message when new members join the server
   - type `!!export` to get a downloadable json file with all guild configurations
 
-## [0.6.1] - 2019-25-09
+## [0.6.1] - 2019-09-25
 ### Fixed
 - no default announcer error!
 
-## [0.6.0] - 2019-25-09
+## [0.6.0] - 2019-09-25
 ### Fixed
 - save guild file when joining new guild
 ### Changed
